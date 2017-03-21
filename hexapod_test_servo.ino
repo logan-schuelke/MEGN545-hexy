@@ -19,30 +19,31 @@ const int angleN = 90; // angle associated with neutral
 
 const int Down = 44; // comma
 const int Up = 46; // period
-const int increment = 10; // increment 10 dgrees per 
+const int increment = 10; // increment 10 degrees per 
 const int nextServo = 93; // ]
 const int prevServo = 91; // [
 
+const int pinOffset = 6;
 #include <Servo.h>
-// I dont know which pins go where, so i just labeled them 1-18
-#define SERVO_1 1
-#define SERVO_2 2
-#define SERVO_3 3
-#define SERVO_4 4
-#define SERVO_5 5
-#define SERVO_6 6
-#define SERVO_7 7
-#define SERVO_8 8
-#define SERVO_9 9
-#define SERVO_10 10
-#define SERVO_11 11
-#define SERVO_12 12
-#define SERVO_13 13
-#define SERVO_14 14
-#define SERVO_15 15
-#define SERVO_16 16
-#define SERVO_17 17
-#define SERVO_18 18
+// pinOffset allows servos to be split bt the two sides of the board
+#define SERVO_1 1 + pinOffset
+#define SERVO_2 2 + pinOffset
+#define SERVO_3 3 + pinOffset
+#define SERVO_4 4 + pinOffset
+#define SERVO_5 5 + pinOffset
+#define SERVO_6 6 + pinOffset
+#define SERVO_7 7 + pinOffset
+#define SERVO_8 8 + pinOffset
+#define SERVO_9 9 + pinOffset
+#define SERVO_10 10 + pinOffset
+#define SERVO_11 11 + pinOffset
+#define SERVO_12 12 + pinOffset
+#define SERVO_13 13 + pinOffset
+#define SERVO_14 14 + pinOffset
+#define SERVO_15 15 + pinOffset
+#define SERVO_16 16 + pinOffset
+#define SERVO_17 17 + pinOffset
+#define SERVO_18 18 + pinOffset
 
 Servo FrHip; Servo FrKnee; Servo FrAnkle;
 Servo FlHip; Servo FlKnee; Servo FlAnkle;
@@ -58,12 +59,14 @@ void setup() {
   MlHip.attach(SERVO_13); MlKnee.attach(SERVO_14); MlAnkle.attach(SERVO_15);
   BlHip.attach(SERVO_16); BlKnee.attach(SERVO_17); BlAnkle.attach(SERVO_18);
 
+/*
   FrHip.write(angle1); FrKnee.write(angle1); FrAnkle.write(angle1);
   MrHip.write(angle1); MrKnee.write(angle1); MrAnkle.write(angle1);
   BrHip.write(angle1); BrKnee.write(angle1); BrAnkle.write(angle1);
   FlHip.write(angle1); FlKnee.write(angle1); FlAnkle.write(angle1);
   MlHip.write(angle1); MlKnee.write(angle1); MlAnkle.write(angle1);
   BlHip.write(angle1); BlKnee.write(angle1); BlAnkle.write(angle1);
+*/
 
   Serial.begin(9600);
 }
