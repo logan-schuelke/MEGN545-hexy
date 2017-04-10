@@ -6,7 +6,7 @@ Main code for Hexy Robot
 #include <BasicLinearAlgebra.h>
 #include <MemoryDelegate.hpp>
 
-#include <ros.h
+#include <ros.h>
 #include <SPI.h>
 #include <Pixy.h>
 #include <math.h>
@@ -17,53 +17,75 @@ int x;
 int y;
 uint16_t blocks;
 char buf[32]; 
-int target = 1; // any number from 1-7 for normal signatures
-float error = 0.3;
-float dist;
+const int target = 2; // any number from 1-7 for normal signatures, orange is taught on signature 2
+//float error = 0.3;
+//float dist;
+const int maxSize = 32000L; // closest that Hexy can get to Pixy, max camera pixel size is 64000 (320*200)
+const int xCenter = 160L; // center of Pixy lens
+const int yCenter = 100L;
 
 void setup() {
     Serial.begin(9600);
+    Serial.print("Starting...\n");
     
     pixy.init();
 }
 
 void loop() {
-  // Hexy will walk towards specified object
+  // Hexy looks for blocks, rotates to center largest target block in Pixy view, 
+  // takes one step towards or away from it, then repeats looking for blocks
   // resource: http://www.cmucam.org/projects/cmucam5/wiki/LEGO_Chase_Demo
   // http://www.cmucam.org/projects/cmucam5/wiki/PID_LEGO_Block
   
 
   // look for blocks
   blocks = pixy.getBlocks(); 
-  // figure what this fn does
-  // does this function only return objects with specific signature?
+  // this function returns number of blocks (objects) detected, starting from 1
   
-  // If the block we want is in view, rotate Hexy to face it, then walk towards it
-  if (blocks) {
+  // If the block we want is in view, rotate Hexy to face it, then take 1 step towards or away from it
+  if (blocks) { // if blocks are detected...
+    int size = 0;
+    int blockNum;
     for (j=0; j<blocks; j++) {
       if (pixy.blocks[j].signature == target) {
-        blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
-        if (x < 160) { // 160 is x center of lens
-          rotateLeft(); // rotate to position object in center of Pixy's view
-        } 
-        else if (x > 160) {
-          rotateRight();
-        }
-        while (dist >= error) {
-          walkForward(1); // 1 step
-        }
-        while (dist <= error){
-          walkBackward(1);
+        //blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
+        
+        // if multiple blocks detected in target signature, choose largest object to follow
+        w = pixy.blocks[j].width;
+        h = pixy.blocks[j].height;
+        int jsize = w*h; 
+        if (jsize >= size) {
+            size = jsize;
+            blockNum = j;
         }
       }
     }
-  }
-  
+    x = pixy.blocks[blockNum].x;
+    y = pixy.blocks[blockNum].y;
+    int xError = xCenter - x;
+    int yError = yCenter - y;
+    if (xError > 0) {
+        //rotateCCW(xError); // rotate by xError to position object in center of Pixy's view
+        Serial.print("Hexy rotate CCW\n");
+    } 
+    else if (xError < 0) {
+      //rotateCW(xError);
+      Serial.print("Hexy rotate CW\n");
+    }
+    if (size <= maxSize) {
+      //walkForward(1); // 1 step
+      Serial.print("Hexy walk FORWARD\n");
+    }
+    else if (size >= maxSize){
+      //walkBackward(1);
+      Serial.print("Hexy walk BACKWARD\n");
+    }
+  } 
 }
 
 // GAIT FUNCTIONS
 
-// COMPUTER VISION FUNCTIONS
+// COMPUTER VISION FUNCTIONS // currently not using any of the below
 
 /* blockLocation() finds the x and y coordinates of the block that we want Pixy to identify
   it also scales the object to find the distance Hexy is away from object
