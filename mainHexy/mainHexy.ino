@@ -15,6 +15,8 @@ Pixy pixy;
 int j;
 int x;
 int y;
+int w;
+int h;
 uint16_t blocks;
 char buf[32]; 
 const int target = 2; // any number from 1-7 for normal signatures, orange is taught on signature 2
@@ -25,7 +27,7 @@ const int xCenter = 160L; // center of Pixy lens
 const int yCenter = 100L;
 const int xBand = 80L; // allowable pixels block can be off-center in x
 const int sBand = 4500L; // size range that Hexy will not move forward or backward
-unsigned long lastBlockTime = 0;
+unsigned long lastEventTime = 0;
 
 void setup() {
     Serial.begin(9600);
@@ -47,7 +49,7 @@ void loop() {
   
   // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
   if (blocks) { // if blocks are detected...
-    lastBlockTime = millis(); // record time block is detected
+    lastEventTime = millis(); // record time block is detected
     i++;
     int blockSize = 0;
     int blockNum;
@@ -56,8 +58,8 @@ void loop() {
         //blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
         
         // if multiple blocks detected in target signature, choose largest object to follow
-        int w = pixy.blocks[j].width;
-        int h = pixy.blocks[j].height;
+        w = pixy.blocks[j].width;
+        h = pixy.blocks[j].height;
         // make the blockSize square based on largest dimension
         if (w >= h) { 
           h = w;
@@ -81,7 +83,7 @@ void loop() {
       pixy.blocks[blockNum].print();
       Serial.print(i); // for debugging
       Serial.print("\t");
-      Serial.print(lastBlockTime);
+      Serial.print(lastEventTime);
       Serial.print("\n");
       if (xError >= xBand) {
           //rotateCCW(xError); // rotate by xError to position object in center of Pixy's view
@@ -94,11 +96,11 @@ void loop() {
       else {
         Serial.print("Hexy NO rotate\n");
       }
-      if (sizeError >= sBand) {
+      if (w <= 75) {
         //walkForward(sizeError);
         Serial.print("Hexy walk FORWARD\n");
       }
-      else if (sizeError < -sBand){
+      else if (w > 100){
         //walkBackward(sizeError);
         Serial.print("Hexy walk BACKWARD\n");
       }
@@ -108,14 +110,22 @@ void loop() {
     }
   } 
   // if no blocks detected, rotate randomly to scan for blocks
-  else if (millis() - lastBlockTime > 1000) {
+  else if (millis() - lastEventTime > 5000) {
     long randNum = random(100);
-    if (randNum <= 49) {
-      Serial.print("Hexy search CCW\n");
-    }
-    else {
-      Serial.print("Hexy search CW\n");
-    }
+    //i++;
+    //if (i%50==0) {
+      if (randNum <= 49) {
+        Serial.print("Hexy search CCW\n");
+        Serial.print(millis());
+        lastEventTime = millis();
+      }
+      else {
+        Serial.print("Hexy search CW\n");
+        Serial.print(millis());
+        lastEventTime = millis();
+      }
+   // }
+    
   }
 }
 
