@@ -1,4 +1,7 @@
 /*
+ * This is now updated to use the Servotor.h library rather than Servo.h. 
+ * When using serial monitor, ensure you have the right baud rate (19200).
+ * 
  *This is code to test servo position and range of motion. From this we should be able to get the offsets
  *for each straight joint. Also we may be able to calibrate the nonlinearity of the servos this way.
  *I'm not really sure how to do that though.
@@ -11,11 +14,13 @@
  */
 // Serial test values:
 const int Pos1 = 49; // number 1
-const int angle1 = 0; // angle associated with 1
+const int angle1 = -90; // angle associated with 1
 const int Pos2 = 50; // number 2
-const int angle2 = 180; // angle associated with 2
+const int angle2 = 90; // angle associated with 2
 const int neutral = 48; //number 0
-const int angleN = 90; // angle associated with neutral
+const int angleN = 0; // angle associated with neutral
+int currentPos = 0;
+int selectedServo = 1;
 
 const int Down = 44; // comma
 const int Up = 46; // period
@@ -23,52 +28,40 @@ const int increment = 10; // increment 10 degrees per
 const int nextServo = 93; // ]
 const int prevServo = 91; // [
 
-const int pinOffset = 6;
-#include <Servo.h>
+const int pinOffset = 0;
+
+#include "Servotor32.h" // call the servotor32 Library
+Servotor32 hexy; // create a servotor32 object
+
 // pinOffset allows servos to be split bt the two sides of the board
-#define SERVO_1 1 + pinOffset
-#define SERVO_2 2 + pinOffset
-#define SERVO_3 3 + pinOffset
-#define SERVO_4 4 + pinOffset
-#define SERVO_5 5 + pinOffset
-#define SERVO_6 6 + pinOffset
-#define SERVO_7 7 + pinOffset
-#define SERVO_8 8 + pinOffset
-#define SERVO_9 9 + pinOffset
-#define SERVO_10 10 + pinOffset
-#define SERVO_11 11 + pinOffset
-#define SERVO_12 12 + pinOffset
-#define SERVO_13 13 + pinOffset
-#define SERVO_14 14 + pinOffset
-#define SERVO_15 15 + pinOffset
-#define SERVO_16 16 + pinOffset
-#define SERVO_17 17 + pinOffset
-#define SERVO_18 18 + pinOffset
+const int SERVO_1 = 1 + pinOffset;
+const int SERVO_2 = 2 + pinOffset;
+const int SERVO_3 = 3 + pinOffset;
+const int SERVO_4 = 4 + pinOffset;
+const int SERVO_5 = 5 + pinOffset;
+const int SERVO_6 = 6 + pinOffset;
+const int SERVO_7 = 7 + pinOffset;
+const int SERVO_8 = 8 + pinOffset;
+const int SERVO_9 = 9 + pinOffset;
+const int SERVO_10 = 10 + pinOffset;
+const int SERVO_11 = 11 + pinOffset;
+const int SERVO_12 = 12 + pinOffset;
+const int SERVO_13 = 13 + pinOffset;
+const int SERVO_14 = 14 + pinOffset;
+const int SERVO_15 = 15 + pinOffset;
+const int SERVO_16 = 16 + pinOffset;
+const int SERVO_17 = 17 + pinOffset;
+const int SERVO_18 = 18 + pinOffset;
 
-Servo FrHip; Servo FrKnee; Servo FrAnkle;
-Servo FlHip; Servo FlKnee; Servo FlAnkle;
-Servo BrHip; Servo BrKnee; Servo BrAnkle;
-Servo BlHip; Servo BlKnee; Servo BlAnkle;
-Servo MrHip; Servo MrKnee; Servo MrAnkle;
-Servo MlHip; Servo MlKnee; Servo MlAnkle;
+
 void setup() {
-  FrHip.attach(SERVO_1); FrKnee.attach(SERVO_2); FrAnkle.attach(SERVO_3);
-  MrHip.attach(SERVO_4); MrKnee.attach(SERVO_5); MrAnkle.attach(SERVO_6);
-  BrHip.attach(SERVO_7); BrKnee.attach(SERVO_8); BrAnkle.attach(SERVO_9);
-  FlHip.attach(SERVO_10); FlKnee.attach(SERVO_11); FlAnkle.attach(SERVO_12);
-  MlHip.attach(SERVO_13); MlKnee.attach(SERVO_14); MlAnkle.attach(SERVO_15);
-  BlHip.attach(SERVO_16); BlKnee.attach(SERVO_17); BlAnkle.attach(SERVO_18);
-
-/*
-  FrHip.write(angle1); FrKnee.write(angle1); FrAnkle.write(angle1);
-  MrHip.write(angle1); MrKnee.write(angle1); MrAnkle.write(angle1);
-  BrHip.write(angle1); BrKnee.write(angle1); BrAnkle.write(angle1);
-  FlHip.write(angle1); FlKnee.write(angle1); FlAnkle.write(angle1);
-  MlHip.write(angle1); MlKnee.write(angle1); MlAnkle.write(angle1);
-  BlHip.write(angle1); BlKnee.write(angle1); BlAnkle.write(angle1);
-*/
-
-  Serial.begin(9600);
+  hexy.begin();
+  
+  Serial.begin(19200);
+  while(!Serial){}
+  Serial.println("1 for pos1, 2 for pos2, 0 for neutral");
+  Serial.println("comma(<) for decrease angle, period(>) for increase angle");
+  Serial.println("[ for prev servo, ] for next servo");
 }
 //////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////MAIN_LOOP////////////////////////////////////////////////////////
@@ -84,18 +77,17 @@ void loop() {
 /////////////////////////////////////////////////
 // Loop for testing servos:
 void servoTestLoop(){
-  Serial.println("1 for pos1, 2 for pos2, 0 for neutral");
-  Serial.println("comma(<) for decrease angle, period(>) for increase angle");
-  Serial.println("[ for prev servo, ] for next servo");
+//  Serial.println("1 for pos1, 2 for pos2, 0 for neutral");
+//  Serial.println("comma(<) for decrease angle, period(>) for increase angle");
+//  Serial.println("[ for prev servo, ] for next servo");
   while(true){ // loops forever
-    testServos(SERVO_1);
+    testServos();
   }
 }
 /////////////////////////////////////////////////
 // This is to test servos:
-void testServos( int selectedServo ){
+void testServos(){
   int val = getVal();
-  int currentPos;
   if( val == Pos1 ){
     currentPos = angle1;
   }
@@ -107,14 +99,14 @@ void testServos( int selectedServo ){
   }
   else if( val == Up ){
     currentPos += increment;
-    if( currentPos > 180 ){ //Makes sure it doesn't go over 180 deg
-      currentPos = 180;
+    if( currentPos > 90 ){ //Makes sure it doesn't go over 180 deg
+      currentPos = 90;
     }    
   }
   else if( val == Down ){
     currentPos -= increment;
-    if( currentPos < 0 ){ //Makes sure it doesn't go below 0 deg 
-      currentPos = 0;
+    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
+      currentPos = -90;
     }    
   }
   else if( val == nextServo ){
@@ -141,80 +133,7 @@ void testServos( int selectedServo ){
 // This is to select servo for testing.
 // We could probably use this later too.
 void servoSelect( int selectedServo, int inputAngle ){
-  switch(selectedServo){
-    case SERVO_1:
-    FrHip.write(inputAngle);
-    Serial.println(FrHip.read());
-    break;
-    case SERVO_2:
-    FrKnee.write(inputAngle);
-    Serial.println(FrKnee.read());
-    break;
-    case SERVO_3:
-    FrAnkle.write(inputAngle);
-    Serial.println(FrAnkle.read());
-    break;
-    case SERVO_4:
-    MrHip.write(inputAngle);
-    Serial.println(MrHip.read());
-    break;
-    case SERVO_5:
-    MrKnee.write(inputAngle);
-    Serial.println(MrKnee.read());
-    break;
-    case SERVO_6:
-    MrAnkle.write(inputAngle);
-    Serial.println(MrAnkle.read());
-    break;
-    case SERVO_7:
-    BrHip.write(inputAngle);
-    Serial.println(BrHip.read());
-    break;
-    case SERVO_8:
-    BrKnee.write(inputAngle);
-    Serial.println(BrKnee.read());
-    break;
-    case SERVO_9:
-    BrAnkle.write(inputAngle);
-    Serial.println(BrAnkle.read());
-    break;
-    case SERVO_10:
-    FlHip.write(inputAngle);
-    Serial.println(FlHip.read());
-    break;
-    case SERVO_11:
-    FlKnee.write(inputAngle);
-    Serial.println(FlKnee.read());
-    break;
-    case SERVO_12:
-    FlAnkle.write(inputAngle);
-    Serial.println(FlAnkle.read());
-    break;
-    case SERVO_13:
-    MlHip.write(inputAngle);
-    Serial.println(MlHip.read());
-    break;
-    case SERVO_14:
-    MlKnee.write(inputAngle);
-    Serial.println(MlKnee.read());
-    break;
-    case SERVO_15:
-    MlAnkle.write(inputAngle);
-    Serial.println(MlAnkle.read());
-    break;
-    case SERVO_16:
-    BlHip.write(inputAngle);
-    Serial.println(BlHip.read());
-    break;
-    case SERVO_17:
-    BlKnee.write(inputAngle);
-    Serial.println(BlKnee.read());
-    break;
-    case SERVO_18:
-    BlAnkle.write(inputAngle);
-    Serial.println(BlAnkle.read());
-    break;
-  }
+  hexy.changeServo(selectedServo, a2ms(inputAngle));
 }
 /////////////////////////////////////////////////
 // This gets input from serial
@@ -229,3 +148,11 @@ int getVal(){
   }
   return(input);
 }
+
+//////////////////////////////////////////////////
+// This converts an angle to ms for the servos
+short a2ms(float inAngle){
+  short MS = inAngle*1000/90+1500;
+  return MS;
+}
+
