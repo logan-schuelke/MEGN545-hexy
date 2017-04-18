@@ -9,8 +9,14 @@
  *Enter commands into the Serial Monitor (make sure its at 9600):
  *  "1" = Pos1 (0 degrees)    "2" = Pos2 (180 degrees)    0"" = neutral (90 degrees)
  *  "," = subtract 10 degrees      "." = add 10 degrees
+ *  "n" = subtract 1 degree        "m" = add 1 degree
  *  "[" = previous servo           "]" = next servo
+ * 
  *  
+ * Update 4/17/17:  
+ *  I added code to adjust servos by smaller increments and changed the pinout to match
+ *  the pinout for the forward_movement_outline.
+ *
  */
 // Serial test values:
 const int Pos1 = 49; // number 1
@@ -20,39 +26,21 @@ const int angle2 = 90; // angle associated with 2
 const int neutral = 48; //number 0
 const int angleN = 0; // angle associated with neutral
 int currentPos = 0;
-int selectedServo = 1;
+int selectedServo = 7; //Starts with pin7
 
 const int Down = 44; // comma
 const int Up = 46; // period
 const int increment = 10; // increment 10 degrees per 
 const int nextServo = 93; // ]
 const int prevServo = 91; // [
-
-const int pinOffset = 0;
+const int smallDown = 110; // 'n'
+const int smallUp = 109; // 'm'
 
 #include "Servotor32.h" // call the servotor32 Library
 Servotor32 hexy; // create a servotor32 object
 
-// pinOffset allows servos to be split bt the two sides of the board
-const int SERVO_1 = 1 + pinOffset;
-const int SERVO_2 = 2 + pinOffset;
-const int SERVO_3 = 3 + pinOffset;
-const int SERVO_4 = 4 + pinOffset;
-const int SERVO_5 = 5 + pinOffset;
-const int SERVO_6 = 6 + pinOffset;
-const int SERVO_7 = 7 + pinOffset;
-const int SERVO_8 = 8 + pinOffset;
-const int SERVO_9 = 9 + pinOffset;
-const int SERVO_10 = 10 + pinOffset;
-const int SERVO_11 = 11 + pinOffset;
-const int SERVO_12 = 12 + pinOffset;
-const int SERVO_13 = 13 + pinOffset;
-const int SERVO_14 = 14 + pinOffset;
-const int SERVO_15 = 15 + pinOffset;
-const int SERVO_16 = 16 + pinOffset;
-const int SERVO_17 = 17 + pinOffset;
-const int SERVO_18 = 18 + pinOffset;
-
+const int numberOfServos = 18;
+const int firstServo = 7;
 
 void setup() {
   hexy.begin();
@@ -60,7 +48,8 @@ void setup() {
   Serial.begin(19200);
   while(!Serial){}
   Serial.println("1 for pos1, 2 for pos2, 0 for neutral");
-  Serial.println("comma(<) for decrease angle, period(>) for increase angle");
+  Serial.println("Use comma(<) to decrease angle, period(>) to increase angle.");
+  Serial.println("For more precise adjustment, use 'n' for down, 'm' for up.");
   Serial.println("[ for prev servo, ] for next servo");
 }
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -77,9 +66,6 @@ void loop() {
 /////////////////////////////////////////////////
 // Loop for testing servos:
 void servoTestLoop(){
-//  Serial.println("1 for pos1, 2 for pos2, 0 for neutral");
-//  Serial.println("comma(<) for decrease angle, period(>) for increase angle");
-//  Serial.println("[ for prev servo, ] for next servo");
   while(true){ // loops forever
     testServos();
   }
@@ -90,29 +76,55 @@ void testServos(){
   int val = getVal();
   if( val == Pos1 ){
     currentPos = angle1;
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
   }
   else if( val == Pos2 ){
     currentPos = angle2;
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
   }
   else if( val == neutral ){
     currentPos = angleN;
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
   }
   else if( val == Up ){
     currentPos += increment;
     if( currentPos > 90 ){ //Makes sure it doesn't go over 180 deg
       currentPos = 90;
-    }    
+    }
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);    
   }
   else if( val == Down ){
     currentPos -= increment;
     if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
       currentPos = -90;
     }    
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
+  }
+  else if( val == smallDown ){
+    currentPos -= 1;
+    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
+      currentPos = -90;
+    }    
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
+  }
+  else if( val == smallUp ){
+    currentPos += 1;
+    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
+      currentPos = -90;
+    }    
+    Serial.print("Servo angle = ");
+    Serial.println(currentPos);
   }
   else if( val == nextServo ){
     selectedServo += 1;
-    if( selectedServo > SERVO_18 ){ //Makes sure max servo is 18
-      selectedServo = SERVO_18;
+    if( selectedServo > numberOfServos+firstServo ){ //Makes sure max servo is 18
+      selectedServo = numberOfServos+firstServo;
     }
     currentPos = Pos1;
     Serial.print("Selected servo = ");
@@ -120,8 +132,8 @@ void testServos(){
   }
   else if( val == prevServo ){
     selectedServo -= 1;
-    if( selectedServo < SERVO_1 ){ // makes sure min servo is 1
-      selectedServo = SERVO_1;
+    if( selectedServo < firstServo ){ // makes sure min servo is 1
+      selectedServo = firstServo;
     }
     currentPos = Pos1;
     Serial.print("Selected servo = ");
@@ -141,7 +153,7 @@ int getVal(){
   int input;
   if (Serial.available() > 0) {
     input = Serial.read();
-    Serial.println(input);
+    //Serial.println(input);
   }
   else{
     input = -1;
