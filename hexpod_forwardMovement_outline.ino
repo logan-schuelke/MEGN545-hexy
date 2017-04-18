@@ -6,6 +6,19 @@
  *  and figure out which way we'll do it. I am more familiar with servo.h, but
  *  it may be easier if we can use servotor.h
  *  
+ *  /////////////////////////////////////////////////////////////////////////////////
+ *  Update 4/16/07:
+ *  -I found some reasonable values for the constants we needed. 
+ *  -Cleaned up some code by changing a few sets of variables to arrays, 
+ *   allowing me to eliminate some if and else statements.
+ *  -I added an array for storing servo calibration offsets ( calibOff[] )
+ *  -I reordered the pins for each servo as follows:
+ *      Starting with pin 7 at the HIP of the FRONT LEFT leg,
+ *      pins proceed HIP-KNEE-ANKLE on each leg and then
+ *      legs LF-LM-LB-RF-RM-RB
+ *    Array positions are ordered the same, but start at position 0.
+ *    
+ * //////////////////////////////////////////////////////////////////////////////////// 
  *  Update 4/13/17:
  *  I added servo control conde using the servotor library.
  *  It should be ready to test forward movement using the serial monitor on 19200 baud.
@@ -20,29 +33,20 @@
 #include "Servotor32.h" // call the servotor32 Library
 Servotor32 hexy; // create a servotor32 object
 
-//We'll need to figure out reasonable values for all these consts:
-const short maxStep = 50; // this is max z distance foot can move forward
-const short minStep = -10; // this is max z distance foot can move backward
-const short stepIncrement = 1; // how far each foot moves every loop- lower = smoother but slower
-const short yLift = 10; // height of body relative to foot while foot is lifted.
-const short yStand = 20; // height of body relative to foot while foot is planted.
-const short xF = 10; // lateral distance between foot and body for front feet (also back), while striding
-const short xM = 15; // lateral distance between foot and body for middle feet, while striding
+//Calibration offsets:
+const short bodyAngle = 49.22;
+// add or subtract degrees to change offsets when calibrating:
+const short calibOff[] = {bodyAngle,0,0,0,0,0,-bodyAngle,0,0,bodyAngle,0,0,0,0,0,-bodyAngle,0,0};
 
-short footPos1 = 0; // position of front right foot
-short footPos2 = 0; // position of front left foot
-short z1; // delta z of tripod 1
-short z2; // delta z of tripod 2
+boolean tripodLifted[] = {false,false};
+boolean fullStep[] = {false,false};
 
-boolean tripod1Lifted;
-boolean tripod2Lifted;
+const int tripod1 = 0;
+const int tripod2 = 1;
 
-const int tripod1 = 1;
-const int tripod2 = 2;
-
-const short START_POS_HIP = (0+90);
-const short START_POS_KNEE = (30+90);
-const short START_POS_ANKLE = (60+90);
+const short START_POS_HIP = (0);
+const short START_POS_KNEE = (45);
+const short START_POS_ANKLE = (45);
 
 // Leg measurements in mm:
 const short TIBIA = 52.0;
@@ -51,6 +55,19 @@ const short COXA = 26.0;
 //Here's pi:
 const short pi = 3.14159265359;
 
+//Here are some contants that might need to be changed:
+const short maxStep = 45.92; // this is max z distance foot can move forward
+const short minStep = 0; // this is max z distance foot can move backward
+const short stepIncrement = 1; // how far each foot moves every loop- lower = smoother but slower
+const short yStand = TIBIA + sin(START_POS_KNEE*pi/180); // height of body relative to foot while foot is planted.
+const short yLift = yStand -15; // height of body relative to foot while foot is lifted.
+const short xF = 39.6128; // lateral distance between foot and body for front feet (also back), while striding
+const short xM = 60.6482; // lateral distance between foot and body for middle feet, while striding
+const int dropDelay = 1000; // How long to wait after telling legs to drop
+
+short footPos[] = {maxStep,maxStep}; // z position of front right foot, front left foot
+short z[] = {0,0}; // delta z of tripod 1 & 2 
+
 // Initialize joint angle vectors:
 short servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
@@ -58,26 +75,27 @@ short servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE};
-// pinOffset allows servos to be split bt the two sides of the board
-const int pinOffset = 0;
-const int SERVO_1 = 1 + pinOffset;
-const int SERVO_2 = 2 + pinOffset;
-const int SERVO_3 = 3 + pinOffset;
-const int SERVO_4 = 4 + pinOffset;
-const int SERVO_5 = 5 + pinOffset;
-const int SERVO_6 = 6 + pinOffset;
-const int SERVO_7 = 7 + pinOffset;
-const int SERVO_8 = 8 + pinOffset;
-const int SERVO_9 = 9 + pinOffset;
-const int SERVO_10 = 10 + pinOffset;
-const int SERVO_11 = 11 + pinOffset;
-const int SERVO_12 = 12 + pinOffset;
-const int SERVO_13 = 13 + pinOffset;
-const int SERVO_14 = 14 + pinOffset;
-const int SERVO_15 = 15 + pinOffset;
-const int SERVO_16 = 16 + pinOffset;
-const int SERVO_17 = 17 + pinOffset;
-const int SERVO_18 = 18 + pinOffset;
+                       
+/*
+const int SERVO_1 = 0 + pinOffset;
+const int SERVO_2 = 1 + pinOffset;
+const int SERVO_3 = 2 + pinOffset;
+const int SERVO_4 = 3 + pinOffset;
+const int SERVO_5 = 4 + pinOffset;
+const int SERVO_6 = 5 + pinOffset;
+const int SERVO_7 = 6 + pinOffset;
+const int SERVO_8 = 7 + pinOffset;
+const int SERVO_9 = 8 + pinOffset;
+const int SERVO_10 = 9 + pinOffset;
+const int SERVO_11 = 10 + pinOffset;
+const int SERVO_12 = 11 + pinOffset;
+const int SERVO_13 = 12 + pinOffset;
+const int SERVO_14 = 13 + pinOffset;
+const int SERVO_15 = 14 + pinOffset;
+const int SERVO_16 = 15 + pinOffset;
+const int SERVO_17 = 16 + pinOffset;
+const int SERVO_18 = 17 + pinOffset;
+*/
 
 // Or maybe we'll do it this way:
 // To get array element number: (leg name)*LEG + (joint name)
@@ -86,9 +104,12 @@ const int SERVO_18 = 18 + pinOffset;
 //
 // We'll probably want to rearrange these according to the best way to hook up the wires,
 //  but we should be able to keep the same formula.
-const int RF = 1; const int RM = 2; const int RB = 3;
-const int LF = 4; const int LM = 5; const int LB = 6;
+const int RF = 4; const int RM = 5; const int RB = 6;
+const int LF = 1; const int LM = 2; const int LB = 3;
 const int LEG = 3; const int HIP = -3; const int KNEE = -2; const int ANKLE = -1;
+
+// pinOffset allows servos to be split bt the two sides of the board
+const int pinOffset = 7;
 
 // for movement test function:
 boolean goForward = false;
@@ -112,16 +133,30 @@ void loop() {
 ///////////////////////////////////////////////////////////////////
 void moveForward(){
   
-  if(tripod1Lifted){ //swings tripod1's legs while tripod2 powers
-    swingLegs(tripod1);
-    powerLegs(tripod2);
+  if(tripodLifted[tripod1]){ //swings tripod1's legs while tripod2 powers
+    if(!fullStep[tripod1]||!fullStep[tripod2]){
+      swingLegs(tripod1);
+      powerLegs(tripod2);
+      }
+    else{
+      dropLegs(tripod1);
+      hexy.delay_ms(dropDelay); // wait
+      liftLegs(tripod2);
+      }
     }
-  else if(tripod2Lifted){ // vice versa
-    swingLegs(tripod2);
-    powerLegs(tripod1);
+  else if(tripodLifted[tripod2]){ // vice versa
+    if(!fullStep[tripod1]||!fullStep[tripod2]){
+      swingLegs(tripod2);
+      powerLegs(tripod1);
+    }
+    else{
+      dropLegs(tripod2);
+      hexy.delay_ms(dropDelay); // wait
+      liftLegs(tripod1);
+      }
     }
   else{ //all feet are touching ground, so it lifts a tripod
-    if(footPos1 > footPos2){
+    if(footPos[tripod1] > footPos[tripod2]){
       liftLegs(tripod2);
     }
     else{
@@ -132,75 +167,39 @@ void moveForward(){
 
 ////////////////////////////////////////////////////////////////////
 void liftLegs(int tripod){
-  if(tripod == tripod1){
-    solveLegs(yLift,z1,tripod);
-    moveLegs(tripod);
-    tripod1Lifted = true;
-  }
-  else{
-    solveLegs(yLift,z2,tripod);
-    moveLegs(tripod);
-    tripod2Lifted = true;
-  }
+  solveLegs(yLift,z[tripod],tripod);
+  moveLegs(tripod);
+  tripodLifted[tripod] = true;
 }
 //////////////////////////////////////////////////////////////////
 void dropLegs(int tripod){
-  if(tripod == tripod1){
-    solveLegs(yStand,z1,tripod);
-    moveLegs(tripod);
-    tripod1Lifted = false;
-  }
-  else{
-    solveLegs(yStand,z2,tripod);
-    moveLegs(tripod);
-    tripod2Lifted = false;
-  }
+  solveLegs(yStand,z[tripod],tripod);
+  moveLegs(tripod);
+  tripodLifted[tripod] = false;
 }
 //////////////////////////////////////////////////////////////////
 void swingLegs(int tripod){
-  if(tripod==tripod1){
-    if(footPos1<=maxStep){
-      z1 += stepIncrement;
-      solveLegs(yLift,z1,tripod);
-      moveLegs(tripod);
-    }
-    else{
-      dropLegs(tripod);
-    }
+
+  if(footPos[tripod]<=maxStep){
+    z[tripod] += stepIncrement;
+    solveLegs(yLift,z[tripod],tripod);
+    moveLegs(tripod);
   }
   else{
-    if(footPos2<=maxStep){
-      z2 += stepIncrement;
-      solveLegs(yLift,z2,tripod);
-      moveLegs(tripod);
-    }
-    else{
-      dropLegs(tripod);
-    }
+    fullStep[tripod] = true;
   }
 }
 
 ///////////////////////////////////////////////////////////////////
 void powerLegs(int tripod){
-  if(tripod==tripod1){
-    if(footPos1>=minStep){
-      z1 -= stepIncrement;
-      solveLegs(yStand,z1,tripod);
-      moveLegs(tripod);
-    }
-    else{
-      liftLegs(tripod);
-    }
+
+  if(footPos[tripod]>=minStep){
+    z[tripod] -= stepIncrement;
+    solveLegs(yStand,z[tripod],tripod);
+    moveLegs(tripod);
   }
   else{
-    if(footPos2>=minStep){
-      z2 -= stepIncrement;
-      solveLegs(yStand,z2,tripod);
-      moveLegs(tripod);
-    }
-    else{
-      liftLegs(tripod);
-    }
+    fullStep[tripod] = true;
   }
 }
 
@@ -216,6 +215,7 @@ void moveLegs(int tripod){
     changeAngles(RM);
     changeAngles(LB);
   }
+  footPos[tripod] = solveFootZ(tripod);
 }
 /////////////////////////////////////////////////////////////////
 void solveLegs(short y,short z,int tripod){
@@ -263,14 +263,46 @@ void solveJoints(short x, short y, short z,  int leg){
   beta = pi - h;
   theta = atan( z / x );
   // Result in degrees:
-  servoAngles[firstJointIndex] = theta * 180 / pi;
-  servoAngles[firstJointIndex+1] = alpha * 180 / pi;
-  servoAngles[firstJointIndex+2] = beta * 180 / pi;
+  servoAngles[firstJointIndex] = theta * 180 / pi - calibOff[firstJointIndex];
+  servoAngles[firstJointIndex+1] = alpha * 180 / pi - calibOff[firstJointIndex+1];
+  servoAngles[firstJointIndex+2] = beta * 180 / pi - calibOff[firstJointIndex+2];
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// This solves for z foot position, given joint angles. Useful so the robot knows where it is.
+short solveFootZ( int tripod ){
+  // Declare vars:
+  float L, y, x, z;
+  int leg;
+  if(tripod==tripod1){
+    leg = RF;
+  }
+  else{
+    leg = LF;
+  }
+  
+  // Convert angles to radians:
+  float alpha = (servoAngles[legIndex(leg,KNEE)] + calibOff[legIndex(leg,KNEE)]) * pi / 180;
+  float beta = (servoAngles[legIndex(leg,ANKLE)] + calibOff[legIndex(leg,ANKLE)]) * pi / 180;
+  float theta = (servoAngles[legIndex(leg,HIP)] + calibOff[legIndex(leg,HIP)]) * pi / 180;
+
+  L = COXA + FEMUR * cos(alpha) + TIBIA * cos(alpha+beta);
+  y = FEMUR * sin(alpha) + TIBIA * sin(alpha+beta);
+  x = L * cos(theta);
+  z = L * sin(theta);
+
+  return(z);
 }
 
 //////////////////////////////////////////////////
 // This converts an angle to ms for the servos
 short a2ms(short inAngle){
+  if(inAngle>90){
+    inAngle = 90;
+  }
+  else if(inAngle<-90){
+    inAngle = -90;
+  }
   short MS = inAngle*1000/90+1500;
   return MS;
 }
@@ -305,6 +337,7 @@ void serialMoveTest(){
     if(val==STOP){
       goForward = false;
       Serial.println("STOP");
+      servoRest();
     }
   }
 }
