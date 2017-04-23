@@ -267,13 +267,13 @@ void changeAngles(int leg){
   int ankle = hip + 2;
   if( leg == LF || leg == LM || leg == LB ){
     hexy.changeServo(hip + pinOffset, -a2ms(servoAngles[hip]));
-    hexy.changeServo(knee + pinOffset, -a2ms(servoAngles[knee]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
     hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
   else{
     hexy.changeServo(hip + pinOffset, a2ms(servoAngles[hip]));
     hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
-    hexy.changeServo(ankle + pinOffset, a2ms(servoAngles[ankle]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
 }
 
