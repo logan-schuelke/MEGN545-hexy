@@ -28,6 +28,13 @@
  *    Specifically, the following constants need to be calculated and/or calibrated:
  *      maxStep, minStep, stepIncrement, yLift, yStand, xF, xM, and maybe a few more.
  *  
+ * /////////////////////////////////////////////////////////////////////////////////////
+ *  Update 4/22/2017
+ *  I fixed the code for each servo's calibration and orientation. I should now give
+ *    the correct hip angle for each leg. Calibration offsets have not yet been entered.
+ *  Added delays so the servos can keep up with the program.
+ *  Added a default ready stance function.
+ *    
  */
 
 #include "Servotor32.h" // call the servotor32 Library
@@ -35,8 +42,8 @@ Servotor32 hexy; // create a servotor32 object
 
 //Calibration offsets:
 const short bodyAngle = 49.22;
-// add or subtract degrees to change offsets when calibrating:
-const short calibOff[] = {bodyAngle,0,0,0,0,0,-bodyAngle,0,0,bodyAngle,0,0,0,0,0,-bodyAngle,0,0};
+// Enter calibration angle for each servo here:
+const short calibOff[] = {-bodyAngle,0,0,0,0,0,bodyAngle,0,0,-bodyAngle,0,0,0,0,0,bodyAngle,0,0};
 
 boolean tripodLifted[] = {false,false};
 boolean fullStep[] = {false,false};
@@ -63,7 +70,10 @@ const short yStand = TIBIA + sin(START_POS_KNEE*pi/180); // height of body relat
 const short yLift = yStand -15; // height of body relative to foot while foot is lifted.
 const short xF = 39.6128; // lateral distance between foot and body for front feet (also back), while striding
 const short xM = 60.6482; // lateral distance between foot and body for middle feet, while striding
-const int dropDelay = 1000; // How long to wait after telling legs to drop
+// All delays in ms:
+const int dropDelay = 500; // How long to wait after telling legs to drop
+const int readyDelay = 1000; // How to wait for legs to get into start positoin
+const int incrementDelay = 50; // How long to wait each incremental movement
 
 short footPos[] = {maxStep,maxStep}; // z position of front right foot, front left foot
 short z[] = {0,0}; // delta z of tripod 1 & 2 
@@ -127,31 +137,34 @@ void setup() {
 }
 
 void loop() {
-  serialMoveTest(); // Test function for forward movement.
+  setReadyStance(); // gets legs ready to move
+  while(true){ // forever loops
+    serialMoveTest(); // Test function for forward movement.
+  }
 }
 ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////
 void moveForward(){
   
-  if(tripodLifted[tripod1]){ //swings tripod1's legs while tripod2 powers
+  if(tripodLifted[tripod1]){ 
+    //swings tripod1's legs while tripod2 powers
     if(!fullStep[tripod1]||!fullStep[tripod2]){
       swingLegs(tripod1);
       powerLegs(tripod2);
       }
     else{
       dropLegs(tripod1);
-      hexy.delay_ms(dropDelay); // wait
       liftLegs(tripod2);
       }
     }
-  else if(tripodLifted[tripod2]){ // vice versa
+  else if(tripodLifted[tripod2]){ 
+    // vice versa
     if(!fullStep[tripod1]||!fullStep[tripod2]){
       swingLegs(tripod2);
       powerLegs(tripod1);
     }
     else{
       dropLegs(tripod2);
-      hexy.delay_ms(dropDelay); // wait
       liftLegs(tripod1);
       }
     }
@@ -170,12 +183,14 @@ void liftLegs(int tripod){
   solveLegs(yLift,z[tripod],tripod);
   moveLegs(tripod);
   tripodLifted[tripod] = true;
+  hexy.delay_ms(dropDelay); // wait
 }
 //////////////////////////////////////////////////////////////////
 void dropLegs(int tripod){
   solveLegs(yStand,z[tripod],tripod);
   moveLegs(tripod);
   tripodLifted[tripod] = false;
+  hexy.delay_ms(dropDelay); // wait
 }
 //////////////////////////////////////////////////////////////////
 void swingLegs(int tripod){
@@ -203,6 +218,17 @@ void powerLegs(int tripod){
   }
 }
 
+//////////////////////////////////////////////////////////////////
+// This puts all feet on the ground, tripod 1 in forward position, 
+//  tripod2 in rear position.
+void setReadyStance(){
+  solveLegs(yStand, 0, tripod2);
+  solveLegs(yStand, maxStep, tripod1);
+  moveLegs(tripod1);
+  moveLegs(tripod2);
+  hexy.delay_ms(readyDelay); // wait for legs to get into position
+}
+
 /////////////////////////////////////////////////////////////////
 void moveLegs(int tripod){
   if(tripod==tripod1){
@@ -216,18 +242,19 @@ void moveLegs(int tripod){
     changeAngles(LB);
   }
   footPos[tripod] = solveFootZ(tripod);
+  hexy.delay_ms(incrementDelay); // wait
 }
 /////////////////////////////////////////////////////////////////
 void solveLegs(short y,short z,int tripod){
   if(tripod==tripod1){
     solveJoints(xF,y,z,RF);
-    solveJoints(xM,y,z,LM);
-    solveJoints(xF,y,z,RB);
+    solveJoints(xM,y,z - maxStep/2,LM);
+    solveJoints(xF,y,z - maxStep,RB);
   }
   else{
     solveJoints(xF,y,z,LF);
-    solveJoints(xM,y,z,RM);
-    solveJoints(xF,y,z,LB);
+    solveJoints(xM,y,z - maxStep/2,RM);
+    solveJoints(xF,y,z - maxStep,LB);
   }
 }
 //////////////////////////////////////////////////////////////////
@@ -238,9 +265,16 @@ void changeAngles(int leg){
   int hip = legIndex(leg,HIP);
   int knee = hip + 1;
   int ankle = hip + 2;
-  hexy.changeServo(hip + pinOffset, a2ms(servoAngles[hip]));
-  hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
-  hexy.changeServo(ankle + pinOffset, a2ms(servoAngles[ankle]));
+  if( leg == LF || leg == LM || leg == LB ){
+    hexy.changeServo(hip + pinOffset, -a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, -a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
+  }
+  else{
+    hexy.changeServo(hip + pinOffset, a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, a2ms(servoAngles[ankle]));
+  }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -263,9 +297,9 @@ void solveJoints(short x, short y, short z,  int leg){
   beta = pi - h;
   theta = atan( z / x );
   // Result in degrees:
-  servoAngles[firstJointIndex] = theta * 180 / pi - calibOff[firstJointIndex];
-  servoAngles[firstJointIndex+1] = alpha * 180 / pi - calibOff[firstJointIndex+1];
-  servoAngles[firstJointIndex+2] = beta * 180 / pi - calibOff[firstJointIndex+2];
+  servoAngles[firstJointIndex] = theta * 180 / pi + calibOff[firstJointIndex];
+  servoAngles[firstJointIndex+1] = alpha * 180 / pi + calibOff[firstJointIndex+1];
+  servoAngles[firstJointIndex+2] = beta * 180 / pi + calibOff[firstJointIndex+2];
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
