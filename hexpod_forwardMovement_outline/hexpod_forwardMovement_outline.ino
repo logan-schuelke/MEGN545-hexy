@@ -227,6 +227,7 @@ void setReadyStance(){
   moveLegs(tripod1);
   moveLegs(tripod2);
   hexy.delay_ms(readyDelay); // wait for legs to get into position
+  Serial.print("setReadyStance complete\n");
 }
 
 /////////////////////////////////////////////////////////////////
@@ -243,6 +244,8 @@ void moveLegs(int tripod){
   }
   footPos[tripod] = solveFootZ(tripod);
   hexy.delay_ms(incrementDelay); // wait
+  Serial.print("moveLegs for: ");
+  Serial.println(tripod);
 }
 /////////////////////////////////////////////////////////////////
 void solveLegs(short y,short z,int tripod){
@@ -256,6 +259,8 @@ void solveLegs(short y,short z,int tripod){
     solveJoints(xM,y,z - maxStep/2,RM);
     solveJoints(xF,y,z - maxStep,LB);
   }
+  Serial.print("solveLegs for: ");
+  Serial.println(tripod);
 }
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
@@ -263,8 +268,8 @@ void solveLegs(short y,short z,int tripod){
 void changeAngles(int leg){
   // this will change the angles of all joints for the given leg to the angles in the given array.
   int hip = legIndex(leg,HIP);
-  int knee = hip + 1;
-  int ankle = hip + 2;
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
   if( leg == LF || leg == LM || leg == LB ){
     hexy.changeServo(hip + pinOffset, -a2ms(servoAngles[hip]));
     hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
@@ -364,16 +369,18 @@ void serialMoveTest(){
   if(val==GO){
     goForward = true;
     Serial.println("GO");
+    delay(5000);
   }
-  while(val==GO){
-    moveForward();
-    val = getVal();
+
+//  while(val==GO){
+//    moveForward();
+//    val = getVal();
     if(val==STOP){
       goForward = false;
       Serial.println("STOP");
       servoRest();
     }
-  }
+ // }
 }
 
 ///////////////////////////////////////////////////////
