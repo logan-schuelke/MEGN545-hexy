@@ -369,7 +369,8 @@ void serialMoveTest(){
   if(val==GO){
     goForward = true;
     Serial.println("GO");
-    delay(5000);
+    delay(5000);  // This might not work due to something weird in the servotor library
+    //hexy.delay_ms(5000); //If something gets fucked up we can probably use this one
   }
 
 //  while(val==GO){
