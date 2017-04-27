@@ -34,7 +34,15 @@
  *    the correct hip angle for each leg. Calibration offsets have not yet been entered.
  *  Added delays so the servos can keep up with the program.
  *  Added a default ready stance function.
- *    
+ *
+ * //////////////////////////////////////////////////////////////////////////////////
+ *  Update 4/26/2017
+ *  So something is't working. Hexy just twitches a little. Jessica tried fixing the way
+ *    pins are called out in changeAngles() and added a bunch of serial.prints to help us
+ *    diagnose the problem. 
+ *  If we can't get this to work soon, I guess I'll start adding some of these functions, 
+ *    one by one, to the servo calibration program to see when it stops working.
+ *
  */
 
 #include "Servotor32.h" // call the servotor32 Library
