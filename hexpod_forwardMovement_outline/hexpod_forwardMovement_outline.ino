@@ -229,19 +229,17 @@ void powerLegs(int tripod){
 //////////////////////////////////////////////////////////////////
 // This puts all feet on the ground, tripod 1 in forward position, 
 //  tripod2 in rear position.
-// something may be wrong with solveLegs - JG
 void setReadyStance(){
-  solveLegs(yStand, 0, tripod2); // definition of yStand doesn't make sense to JG
+  solveLegs(yStand, 0, tripod2);
   solveLegs(yStand, maxStep, tripod1);
-  moveLegs(tripod1); 
+  moveLegs(tripod1);
   moveLegs(tripod2);
   hexy.delay_ms(readyDelay); // wait for legs to get into position
   Serial.print("setReadyStance complete\n");
 }
 
 /////////////////////////////////////////////////////////////////
-// this function works in the testServo code - JG
-void moveLegs(int tripod){ 
+void moveLegs(int tripod){
   if(tripod==tripod1){
     changeAngles(RF);
     changeAngles(LM);
@@ -254,11 +252,10 @@ void moveLegs(int tripod){
   }
   footPos[tripod] = solveFootZ(tripod);
   hexy.delay_ms(incrementDelay); // wait
-  Serial.print("moveLegs for tripod #: ");
+  Serial.print("moveLegs for: ");
   Serial.println(tripod);
 }
 /////////////////////////////////////////////////////////////////
-// start debugging here - JG
 void solveLegs(short y,short z,int tripod){
   if(tripod==tripod1){
     solveJoints(xF,y,z,RF);
@@ -270,28 +267,26 @@ void solveLegs(short y,short z,int tripod){
     solveJoints(xM,y,z - maxStep/2,RM);
     solveJoints(xF,y,z - maxStep,LB);
   }
-  Serial.print("solveLegs for tripod #: ");
+  Serial.print("solveLegs for: ");
   Serial.println(tripod);
 }
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
-// this function works in the testServo code - JG
-void changeAngles(int leg){ 
+void changeAngles(int leg){
   // this will change the angles of all joints for the given leg to the angles in the given array.
   int hip = legIndex(leg,HIP);
   int knee = legIndex(leg,KNEE);
   int ankle = legIndex(leg,ANKLE);
-  // 4/27 - the following code was replaced to use servoSelect, which was added at bottom
   if( leg == LF || leg == LM || leg == LB ){
-    servoSelect(hip + pinOffset, -servoAngles[hip]);
-    servoSelect(knee + pinOffset, servoAngles[knee]);
-    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+    hexy.changeServo(hip + pinOffset, -a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
   else{
-    servoSelect(hip + pinOffset, servoAngles[hip]);
-    servoSelect(knee + pinOffset, servoAngles[knee]);
-    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+    hexy.changeServo(hip + pinOffset, a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
 }
 
@@ -366,7 +361,7 @@ int getVal(){
   int input;
   if (Serial.available() > 0) {
     input = Serial.read();
-    //Serial.println(input);
+    Serial.println(input);
   }
   else{
     input = -1;
@@ -380,21 +375,21 @@ int getVal(){
 void serialMoveTest(){
   int val = getVal();
   if(val==GO){
-    goForward = true; // does not appear to be used - JG
+    goForward = true;
     Serial.println("GO");
-    //delay(5000);  // This might not work due to something weird in the servotor library
+    delay(5000);  // This might not work due to something weird in the servotor library
     //hexy.delay_ms(5000); //If something gets fucked up we can probably use this one
   }
 
-  while(val==GO){
-    moveForward();
-    val = getVal();
+//  while(val==GO){
+//    moveForward();
+//    val = getVal();
     if(val==STOP){
-      goForward = false; // does not appear to be used - JG
+      goForward = false;
       Serial.println("STOP");
       servoRest();
     }
-  }
+ // }
 }
 
 ///////////////////////////////////////////////////////
@@ -411,11 +406,5 @@ void servoRest(){
 // leg constants might need to be altered based on the wiring of the hexy.
 int legIndex(int leg, int joint){
   return (leg*LEG + joint);
-}
-
-/////////////////////////////////////////////////////////
-// Selects the servo to change, taken from testServo code
-void servoSelect( int selectedServo, int inputAngle ){
-  hexy.changeServo(selectedServo, a2ms(inputAngle));
 }
 

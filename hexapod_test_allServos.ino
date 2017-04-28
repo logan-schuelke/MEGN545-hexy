@@ -61,8 +61,8 @@ const int firstServo = 7;
   const int tripod2 = 1;
 
   const short START_POS_HIP = (0);
-  const short START_POS_KNEE = (45); //45
-  const short START_POS_ANKLE = (45); //45
+  const short START_POS_KNEE = (0); //45
+  const short START_POS_ANKLE = (0); //45
 
   short servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                          START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
@@ -182,7 +182,7 @@ void testServos(){
   else if( val == nextServo ){
     selectedServo += 1;
     if( selectedServo > numberOfServos+firstServo ){ //Makes sure max servo is 18
-      selectedServo = numberOfServos+firstServo-1;
+      selectedServo = numberOfServos+firstServo;
     }
     currentPos = Pos1;
     Serial.print("Selected servo = ");
@@ -236,7 +236,7 @@ short a2ms(float inAngle){
 void testAllServos(){
   int val = getVal();
   if(val==Pos1){
-    Serial.println("Setting all joints to zero degrees...");
+    Serial.println("Setting all joints to sero degrees...");
     setAnglesToZero();
     moveLegs();
     Serial.println("...Done");
@@ -303,25 +303,15 @@ void changeAngles(int leg){
   Serial.print(ankle+pinOffset); Serial.print(" to ");
   Serial.print(servoAngles[ankle]); Serial.println(" degrees.");
   
-//  if( leg == LF || leg == LM || leg == LB ){
-//    hexy.changeServo(hip + pinOffset, -servoAngles[hip]);
-//    hexy.changeServo(knee + pinOffset, servoAngles[knee]);
-//    hexy.changeServo(ankle + pinOffset, -servoAngles[ankle]);
-//  }
-//  else{
-//    hexy.changeServo(hip + pinOffset, servoAngles[hip]);
-//    hexy.changeServo(knee + pinOffset, servoAngles[knee]);
-//    hexy.changeServo(ankle + pinOffset, -servoAngles[ankle]);
-//  }
-if( leg == LF || leg == LM || leg == LB ){
-    servoSelect(hip + pinOffset, -servoAngles[hip]);
-    servoSelect(knee + pinOffset, servoAngles[knee]);
-    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+  if( leg == LF || leg == LM || leg == LB ){
+    hexy.changeServo(hip + pinOffset, -a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
   else{
-    servoSelect(hip + pinOffset, servoAngles[hip]);
-    servoSelect(knee + pinOffset, servoAngles[knee]);
-    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+    hexy.changeServo(hip + pinOffset, a2ms(servoAngles[hip]));
+    hexy.changeServo(knee + pinOffset, a2ms(servoAngles[knee]));
+    hexy.changeServo(ankle + pinOffset, -a2ms(servoAngles[ankle]));
   }
 }
 ////////////////////////////////////////////////////////////////////////////
