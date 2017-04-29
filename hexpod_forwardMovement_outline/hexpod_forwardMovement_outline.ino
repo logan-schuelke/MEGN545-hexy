@@ -46,12 +46,15 @@
  */
 
 #include "Servotor32.h" // call the servotor32 Library
+//#include <SPI.h>
+//#include <Pixy.h>
+//Pixy pixy;
 Servotor32 hexy; // create a servotor32 object
 
 //Calibration offsets:
-const short bodyAngle = 49.22;
+const float bodyAngle = 49.22;
 // Enter calibration angle for each servo here:
-const short calibOff[] = {-bodyAngle,0,0,0,0,0,bodyAngle,0,0,-bodyAngle,0,0,0,0,0,bodyAngle,0,0};
+const float calibOff[] = {-bodyAngle,0,0,0,0,0,bodyAngle,0,0,-bodyAngle,0,0,0,0,0,bodyAngle,0,0};
 
 boolean tripodLifted[] = {false,false};
 boolean fullStep[] = {false,false};
@@ -63,31 +66,31 @@ const short START_POS_HIP = (0);
 const short START_POS_KNEE = (45);
 const short START_POS_ANKLE = (45);
 
-// Leg measurements in mm:
-const short TIBIA = 52.0;
-const short FEMUR = 49.0;
-const short COXA = 26.0;
+// Leg measurements in mm: Update - switched values for TIBIA and FEMUR
+const float TIBIA = 49.0;
+const float FEMUR = 52.0;
+const float COXA = 26.0;
 //Here's pi:
-const short pi = 3.14159265359;
+const float pi = 3.14159265359;
 
 //Here are some contants that might need to be changed:
-const short maxStep = 45.92; // this is max z distance foot can move forward
-const short minStep = 0; // this is max z distance foot can move backward
-const short stepIncrement = 1; // how far each foot moves every loop- lower = smoother but slower
-const short yStand = TIBIA + sin(START_POS_KNEE*pi/180); // height of body relative to foot while foot is planted.
-const short yLift = yStand -15; // height of body relative to foot while foot is lifted.
-const short xF = 39.6128; // lateral distance between foot and body for front feet (also back), while striding
-const short xM = 60.6482; // lateral distance between foot and body for middle feet, while striding
+const float maxStep = 45.92; // this is max z distance foot can move forward
+const float minStep = 0; // this is max z distance foot can move backward
+const short stepIncrement = 10; // how far each foot moves every loop- lower = smoother but slower
+const float yStand = TIBIA + FEMUR*sin(START_POS_KNEE*pi/180); // height of body relative to foot while foot is planted.
+const float yLift = yStand -15; // height of body relative to foot while foot is lifted.
+const float xF = 39.6128; // lateral distance between foot and body for front feet (also back), while striding
+const float xM = 60.6482; // lateral distance between foot and body for middle feet, while striding
 // All delays in ms:
 const int dropDelay = 500; // How long to wait after telling legs to drop
 const int readyDelay = 1000; // How to wait for legs to get into start positoin
-const int incrementDelay = 50; // How long to wait each incremental movement
+const int incrementDelay = 0; // How long to wait each incremental movement
 
-short footPos[] = {maxStep,maxStep}; // z position of front right foot, front left foot
-short z[] = {0,0}; // delta z of tripod 1 & 2 
+float footPos[] = {maxStep,maxStep}; // z position of front right foot, front left foot
+float z[] = {0,0}; // delta z of tripod 1 & 2 
 
 // Initialize joint angle vectors:
-short servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+float servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
                        START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
@@ -136,7 +139,7 @@ const int STOP = 49; // enter '1' in serial mon
 
 void setup() {
   hexy.begin();
-  
+  //pixy.init();
   Serial.begin(19200);
   while(!Serial){}
   
@@ -146,6 +149,7 @@ void setup() {
 
 void loop() {
   setReadyStance(); // gets legs ready to move
+  servoRest();
   while(true){ // forever loops
     serialMoveTest(); // Test function for forward movement.
   }
@@ -161,8 +165,10 @@ void moveForward(){
       powerLegs(tripod2);
       }
     else{
-      dropLegs(tripod1);
+      dropLegs(tripod1); 
+      fullStep[tripod1] = false;
       liftLegs(tripod2);
+      fullStep[tripod2] = false;
       }
     }
   else if(tripodLifted[tripod2]){ 
@@ -173,15 +179,19 @@ void moveForward(){
     }
     else{
       dropLegs(tripod2);
+      fullStep[tripod2] = false;
       liftLegs(tripod1);
+      fullStep[tripod1] = false;
       }
     }
   else{ //all feet are touching ground, so it lifts a tripod
     if(footPos[tripod1] > footPos[tripod2]){
       liftLegs(tripod2);
+      fullStep[tripod2] = false;
     }
     else{
       liftLegs(tripod1);
+      fullStep[tripod1] = false;
     }
   }
 }
@@ -205,6 +215,7 @@ void swingLegs(int tripod){
 
   if(footPos[tripod]<=maxStep){
     z[tripod] += stepIncrement;
+    Serial.println(z[tripod]);
     solveLegs(yLift,z[tripod],tripod);
     moveLegs(tripod);
   }
@@ -218,6 +229,7 @@ void powerLegs(int tripod){
 
   if(footPos[tripod]>=minStep){
     z[tripod] -= stepIncrement;
+    Serial.println(z[tripod]);
     solveLegs(yStand,z[tripod],tripod);
     moveLegs(tripod);
   }
@@ -231,35 +243,43 @@ void powerLegs(int tripod){
 //  tripod2 in rear position.
 // something may be wrong with solveLegs - JG
 void setReadyStance(){
-  solveLegs(yStand, 0, tripod2); // definition of yStand doesn't make sense to JG
+  solveLegs(yStand, 0, tripod2);
   solveLegs(yStand, maxStep, tripod1);
   moveLegs(tripod1); 
   moveLegs(tripod2);
   hexy.delay_ms(readyDelay); // wait for legs to get into position
+//  int i;
+//  for(i=0;i<18;i++){
+//    Serial.print("The servoAngles for "); Serial.print(i+7); Serial.print(" is: ");
+//    Serial.println(servoAngles[i]);
+//  }
   Serial.print("setReadyStance complete\n");
+  
 }
 
 /////////////////////////////////////////////////////////////////
 // this function works in the testServo code - JG
 void moveLegs(int tripod){ 
   if(tripod==tripod1){
+    Serial.println("moving tripod1");
     changeAngles(RF);
     changeAngles(LM);
     changeAngles(RB);
   }
   else{
+    Serial.println("moving tripod2");
     changeAngles(LF);
     changeAngles(RM);
     changeAngles(LB);
   }
   footPos[tripod] = solveFootZ(tripod);
+  Serial.println(footPos[tripod]);
   hexy.delay_ms(incrementDelay); // wait
-  Serial.print("moveLegs for tripod #: ");
-  Serial.println(tripod);
+  Serial.println("moveLegs complete");
 }
 /////////////////////////////////////////////////////////////////
 // start debugging here - JG
-void solveLegs(short y,short z,int tripod){
+void solveLegs(float y,float z,int tripod){
   if(tripod==tripod1){
     solveJoints(xF,y,z,RF);
     solveJoints(xM,y,z - maxStep/2,LM);
@@ -299,10 +319,12 @@ void changeAngles(int leg){
 // This will solve joint angles, given x, y, and z in mm, relative to the coxa-body joint.
 // Also pass the appropriate joint array: solveJoints( x, y , z, appropriateJointArray ).
 // I'll have it return the angles in degrees.
-void solveJoints(short x, short y, short z,  int leg){
+void solveJoints(float x, float y, float z,  int leg){
   // Declare vars:
-  int firstJointIndex = legIndex(leg,HIP);
-  short L, l, H, t, f, h, tc, alpha, beta, theta;
+  int hip = legIndex(leg,HIP);
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
+  float L, l, H, t, f, h, tc, alpha, beta, theta;
   // Let's do trig:
   L = abs(sqrt(pow(x,2)+pow(z,2))); l = L - COXA;
   H = abs(sqrt(pow(l,2)+pow(y,2)));
@@ -315,14 +337,18 @@ void solveJoints(short x, short y, short z,  int leg){
   beta = pi - h;
   theta = atan( z / x );
   // Result in degrees:
-  servoAngles[firstJointIndex] = theta * 180 / pi + calibOff[firstJointIndex];
-  servoAngles[firstJointIndex+1] = alpha * 180 / pi + calibOff[firstJointIndex+1];
-  servoAngles[firstJointIndex+2] = beta * 180 / pi + calibOff[firstJointIndex+2];
+  servoAngles[hip] = theta * 180 / pi + calibOff[hip];
+  servoAngles[knee] = alpha * 180 / pi + calibOff[knee];
+  servoAngles[ankle] = beta * 180 / pi + calibOff[ankle];
+//  Serial.println("Solve joints, the servoAngles are: ");
+//  Serial.print("Hip: "); Serial.println(servoAngles[hip]);
+//  Serial.print("Knee: "); Serial.println(servoAngles[knee]);
+//  Serial.print("Ankle: "); Serial.println(servoAngles[ankle]);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
 // This solves for z foot position, given joint angles. Useful so the robot knows where it is.
-short solveFootZ( int tripod ){
+float solveFootZ( int tripod ){
   // Declare vars:
   float L, y, x, z;
   int leg;
@@ -332,11 +358,13 @@ short solveFootZ( int tripod ){
   else{
     leg = LF;
   }
-  
+  int hip = legIndex(leg,HIP);
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
   // Convert angles to radians:
-  float alpha = (servoAngles[legIndex(leg,KNEE)] + calibOff[legIndex(leg,KNEE)]) * pi / 180;
-  float beta = (servoAngles[legIndex(leg,ANKLE)] + calibOff[legIndex(leg,ANKLE)]) * pi / 180;
-  float theta = (servoAngles[legIndex(leg,HIP)] + calibOff[legIndex(leg,HIP)]) * pi / 180;
+  float alpha = (servoAngles[knee] - calibOff[knee]) * pi / 180;
+  float beta = (servoAngles[ankle] - calibOff[ankle]) * pi / 180;
+  float theta = (servoAngles[hip] - calibOff[hip]) * pi / 180;
 
   L = COXA + FEMUR * cos(alpha) + TIBIA * cos(alpha+beta);
   y = FEMUR * sin(alpha) + TIBIA * sin(alpha+beta);
@@ -348,7 +376,7 @@ short solveFootZ( int tripod ){
 
 //////////////////////////////////////////////////
 // This converts an angle to ms for the servos
-short a2ms(short inAngle){
+short a2ms(float inAngle){ // change inAngle from short to float 4/28 jg
   if(inAngle>90){
     inAngle = 90;
   }
@@ -380,17 +408,15 @@ int getVal(){
 void serialMoveTest(){
   int val = getVal();
   if(val==GO){
-    goForward = true; // does not appear to be used - JG
+    goForward = true; 
     Serial.println("GO");
-    //delay(5000);  // This might not work due to something weird in the servotor library
-    //hexy.delay_ms(5000); //If something gets fucked up we can probably use this one
   }
 
-  while(val==GO){
+  while(goForward){
     moveForward();
     val = getVal();
     if(val==STOP){
-      goForward = false; // does not appear to be used - JG
+      goForward = false;
       Serial.println("STOP");
       servoRest();
     }
@@ -415,7 +441,7 @@ int legIndex(int leg, int joint){
 
 /////////////////////////////////////////////////////////
 // Selects the servo to change, taken from testServo code
-void servoSelect( int selectedServo, int inputAngle ){
+void servoSelect( int selectedServo, float inputAngle ){
   hexy.changeServo(selectedServo, a2ms(inputAngle));
 }
 
