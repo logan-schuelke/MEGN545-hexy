@@ -1,16 +1,21 @@
 /*
 Main code for Hexy Robot
+
+Update 5/4/17 - Added hexapod_forwardMovement_outline functions and variables
 */
 
 // BasicLinearAlgebra - Version: Latest 
 //#include <BasicLinearAlgebra.h>
 //#include <MemoryDelegate.hpp>
 
+#include "Servotor32.h" // call the servotor32 Library
 //#include <ros.h>
 #include <SPI.h>
 #include <Pixy.h>
 #include <math.h>
+Servotor32 hexy; // create a servotor32 object
 
+/////////////////// Pixy variables ///////////////////////
 Pixy pixy;
 int j;
 int x;
@@ -29,109 +34,475 @@ const int xBand = 80L; // allowable pixels block can be off-center in x
 const int sBand = 4500L; // size range that Hexy will not move forward or backward
 unsigned long lastEventTime = 0;
 
+//////////////// Movement Variables/////////////////////
+//Calibration offsets:
+const float bodyAngle = 49.22;
+// Enter calibration angle for each servo here:
+const float calibOff[] = {-bodyAngle,0,0,0,0,0,bodyAngle,0,0,-bodyAngle,0,0,0,0,0,bodyAngle,0,0};
+
+boolean tripodLifted[] = {false,false};
+boolean fullStep[] = {false,false};
+
+const int tripod1 = 0;
+const int tripod2 = 1;
+
+const short START_POS_HIP = (0);
+const short START_POS_KNEE = (45);
+const short START_POS_ANKLE = (45);
+
+// Leg measurements in mm: Update - switched values for TIBIA and FEMUR
+const float TIBIA = 49.0;
+const float FEMUR = 52.0;
+const float COXA = 26.0;
+//Here's pi:
+const float pi = 3.14159265359;
+
+//Here are some contants that might need to be changed:
+const float maxStep = 45.92; // this is max z distance foot can move forward
+const float minStep = 0; // this is max z distance foot can move backward
+const short stepIncrement = 10; // how far each foot moves every loop- lower = smoother but slower
+const float yStand = TIBIA + FEMUR*sin(START_POS_KNEE*pi/180); // height of body relative to foot while foot is planted.
+const float yLift = yStand -15; // height of body relative to foot while foot is lifted.
+const float xF = 39.6128; // lateral distance between foot and body for front feet (also back), while striding
+const float xM = 60.6482; // lateral distance between foot and body for middle feet, while striding
+// All delays in ms:
+const int dropDelay = 500; // How long to wait after telling legs to drop
+const int readyDelay = 1000; // How to wait for legs to get into start positoin
+const int incrementDelay = 0; // How long to wait each incremental movement
+
+float footPos[] = {maxStep,maxStep}; // z position of front right foot, front left foot
+float z[] = {0,0}; // delta z of tripod 1 & 2 
+
+// Initialize joint angle vectors:
+float servoAngles[] = {START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+                       START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+                       START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+                       START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+                       START_POS_HIP, START_POS_KNEE, START_POS_ANKLE,
+                       START_POS_HIP, START_POS_KNEE, START_POS_ANKLE};
+
+// To get array element number: (leg name)*LEG + (joint name)
+//    ex: right front knee => RF*LEG + KNEE = 1*3 + -2 = 1
+// To get pin numnber: (leg name)*LEG + (joint name) + pinOffset
+//
+// We'll probably want to rearrange these according to the best way to hook up the wires,
+//  but we should be able to keep the same formula.
+const int RF = 4; const int RM = 5; const int RB = 6;
+const int LF = 1; const int LM = 2; const int LB = 3;
+const int LEG = 3; const int HIP = -3; const int KNEE = -2; const int ANKLE = -1;
+
+// pinOffset allows servos to be split bt the two sides of the board
+const int pinOffset = 7;
+
+// for movement test function:
+boolean goForward = false;
+const int GO = 50; // enter '2' in serial mon
+const int STOP = 49; // enter '1' in serial mon                       
+
+/////////END GLOBAL VARIABLES/////////////
+
 void setup() {
-    Serial.begin(9600);
+    hexy.begin();
+    Serial.begin(19200);
     Serial.print("Starting...\n");
     
     pixy.init();
+    while(!Serial){}
+  
+    // serialMoveTest Instructions:
+    //Serial.println("Enter '2' to start movement, '1' to stop it.");
 }
 
 void loop() {
+  setReadyStance(); // gets legs ready to move
+  servoRest();
   // Hexy looks for blocks, rotates to center largest target block in Pixy view, 
   // takes steps towards or away from it, then repeats looking for blocks
   // resource: http://www.cmucam.org/projects/cmucam5/wiki/LEGO_Chase_Demo
   // http://www.cmucam.org/projects/cmucam5/wiki/PID_LEGO_Block
-  
-
-  // look for blocks
-  blocks = pixy.getBlocks(); // this function returns number of blocks (objects) detected, starting from 1
-  static int i = 0; // only created an initialized the first time loop() is called
-  
-  // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
-  if (blocks) { // if blocks are detected...
-    lastEventTime = millis(); // record time block is detected
-    i++;
-    int blockSize = 0;
-    int blockNum;
-    for (j=0; j<blocks; j++) {
-      if (pixy.blocks[j].signature == target) {
-        //blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
-        
-        // if multiple blocks detected in target signature, choose largest object to follow
-        w = pixy.blocks[j].width;
-        h = pixy.blocks[j].height;
-        // make the blockSize square based on largest dimension
-        if (w >= h) { 
-          h = w;
+  while (true) {
+    // look for blocks
+    blocks = pixy.getBlocks(); // this function returns number of blocks (objects) detected, starting from 1
+    static int i = 0; // only created an initialized the first time loop() is called
+    
+    // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
+    if (blocks) { // if blocks are detected...
+      lastEventTime = millis(); // record time block is detected
+      i++;
+      int blockSize = 0;
+      int blockNum;
+      for (j=0; j<blocks; j++) {
+        if (pixy.blocks[j].signature == target) {
+          //blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
+          
+          // if multiple blocks detected in target signature, choose largest object to follow
+          w = pixy.blocks[j].width;
+          h = pixy.blocks[j].height;
+          // make the blockSize square based on largest dimension
+          if (w >= h) { 
+            h = w;
+          }
+          else {
+            w = h;
+          }
+          int jsize = w*h; 
+          if (jsize >= blockSize) {
+              blockSize = jsize;
+              blockNum = j;
+          }
+        }
+      }
+      x = pixy.blocks[blockNum].x;
+      y = pixy.blocks[blockNum].y;
+      int xError = xCenter - x;
+      int yError = yCenter - y;
+      int sizeError = maxSize - blockSize;
+      if (i%50==0) {
+        pixy.blocks[blockNum].print();
+        Serial.print(i); // for debugging
+        Serial.print("\t");
+        Serial.print(lastEventTime);
+        Serial.print("\n");
+        if (xError >= xBand) {
+            //rotateCCW(xError); // rotate by xError to position object in center of Pixy's view
+            Serial.print("Hexy rotate CCW\n");
+        } 
+        else if (xError < -xBand) {
+          //rotateCW(xError);
+          Serial.print("Hexy rotate CW\n");
         }
         else {
-          w = h;
+          Serial.print("Hexy NO rotate\n");
         }
-        int jsize = w*h; 
-        if (jsize >= blockSize) {
-            blockSize = jsize;
-            blockNum = j;
+        if (w <= 75) {
+          //walkForward(sizeError);
+          moveForward();
+          Serial.print("Hexy walk FORWARD\n");
+        }
+        else if (w > 100){
+          //walkBackward(sizeError);
+          servoRest();
+          Serial.print("Hexy walk BACKWARD\n");
+        }
+        else {
+          servoRest();
+          Serial.print("Hexy NO walk\n");
         }
       }
-    }
-    x = pixy.blocks[blockNum].x;
-    y = pixy.blocks[blockNum].y;
-    int xError = xCenter - x;
-    int yError = yCenter - y;
-    int sizeError = maxSize - blockSize;
-    if (i%50==0) {
-      pixy.blocks[blockNum].print();
-      Serial.print(i); // for debugging
-      Serial.print("\t");
-      Serial.print(lastEventTime);
-      Serial.print("\n");
-      if (xError >= xBand) {
-          //rotateCCW(xError); // rotate by xError to position object in center of Pixy's view
-          Serial.print("Hexy rotate CCW\n");
-      } 
-      else if (xError < -xBand) {
-        //rotateCW(xError);
-        Serial.print("Hexy rotate CW\n");
+    } 
+    // if no blocks detected, rotate randomly to scan for blocks
+    else if (millis() - lastEventTime > 5000) {
+      long randNum = random(100);
+      //i++;
+      //if (i%50==0) {
+        if (randNum <= 49) {
+          Serial.print("Hexy search CCW\n");
+          Serial.print(millis());
+          lastEventTime = millis();
+        }
+        else {
+          Serial.print("Hexy search CW\n");
+          Serial.print(millis());
+          lastEventTime = millis();
+        }
+     // }
       }
-      else {
-        Serial.print("Hexy NO rotate\n");
-      }
-      if (w <= 75) {
-        //walkForward(sizeError);
-        Serial.print("Hexy walk FORWARD\n");
-      }
-      else if (w > 100){
-        //walkBackward(sizeError);
-        Serial.print("Hexy walk BACKWARD\n");
-      }
-      else {
-        Serial.print("Hexy NO walk\n");
-      }
-    }
-  } 
-  // if no blocks detected, rotate randomly to scan for blocks
-  else if (millis() - lastEventTime > 5000) {
-    long randNum = random(100);
-    //i++;
-    //if (i%50==0) {
-      if (randNum <= 49) {
-        Serial.print("Hexy search CCW\n");
-        Serial.print(millis());
-        lastEventTime = millis();
-      }
-      else {
-        Serial.print("Hexy search CW\n");
-        Serial.print(millis());
-        lastEventTime = millis();
-      }
-   // }
-    
   }
 }
 
-// GAIT FUNCTIONS
+///////////////////////////// GAIT FUNCTIONS /////////////////////////////////
+void moveForward(){
+  
+  if(tripodLifted[tripod1]){ 
+    //swings tripod1's legs while tripod2 powers
+    if(!fullStep[tripod1]||!fullStep[tripod2]){
+      swingLegs(tripod1);
+      powerLegs(tripod2);
+      }
+    else{
+      dropLegs(tripod1); 
+      fullStep[tripod1] = false;
+      liftLegs(tripod2);
+      fullStep[tripod2] = false;
+      }
+    }
+  else if(tripodLifted[tripod2]){ 
+    // vice versa
+    if(!fullStep[tripod1]||!fullStep[tripod2]){
+      swingLegs(tripod2);
+      powerLegs(tripod1);
+    }
+    else{
+      dropLegs(tripod2);
+      fullStep[tripod2] = false;
+      liftLegs(tripod1);
+      fullStep[tripod1] = false;
+      }
+    }
+  else{ //all feet are touching ground, so it lifts a tripod
+    if(footPos[tripod1] > footPos[tripod2]){
+      liftLegs(tripod2);
+      fullStep[tripod2] = false;
+    }
+    else{
+      liftLegs(tripod1);
+      fullStep[tripod1] = false;
+    }
+  }
+}
 
-// COMPUTER VISION FUNCTIONS // currently not using any of the below
+////////////////////////////////////////////////////////////////////
+void liftLegs(int tripod){
+  solveLegs(yLift,z[tripod],tripod);
+  moveLegs(tripod);
+  tripodLifted[tripod] = true;
+  hexy.delay_ms(dropDelay); // wait
+}
+//////////////////////////////////////////////////////////////////
+void dropLegs(int tripod){
+  solveLegs(yStand,z[tripod],tripod);
+  moveLegs(tripod);
+  tripodLifted[tripod] = false;
+  hexy.delay_ms(dropDelay); // wait
+}
+//////////////////////////////////////////////////////////////////
+void swingLegs(int tripod){
+
+  if(footPos[tripod]<=maxStep){
+    z[tripod] += stepIncrement;
+    Serial.println(z[tripod]);
+    solveLegs(yLift,z[tripod],tripod);
+    moveLegs(tripod);
+  }
+  else{
+    fullStep[tripod] = true;
+  }
+}
+
+///////////////////////////////////////////////////////////////////
+void powerLegs(int tripod){
+
+  if(footPos[tripod]>=minStep){
+    z[tripod] -= stepIncrement;
+    Serial.println(z[tripod]);
+    solveLegs(yStand,z[tripod],tripod);
+    moveLegs(tripod);
+  }
+  else{
+    fullStep[tripod] = true;
+  }
+}
+
+//////////////////////////////////////////////////////////////////
+// This puts all feet on the ground, tripod 1 in forward position, 
+//  tripod2 in rear position.
+// something may be wrong with solveLegs - JG
+void setReadyStance(){
+  solveLegs(yStand, 0, tripod2);
+  solveLegs(yStand, maxStep, tripod1);
+  moveLegs(tripod1); 
+  moveLegs(tripod2);
+  hexy.delay_ms(readyDelay); // wait for legs to get into position
+//  int i;
+//  for(i=0;i<18;i++){
+//    Serial.print("The servoAngles for "); Serial.print(i+7); Serial.print(" is: ");
+//    Serial.println(servoAngles[i]);
+//  }
+  Serial.print("setReadyStance complete\n");
+  
+}
+
+/////////////////////////////////////////////////////////////////
+// this function works in the testServo code - JG
+void moveLegs(int tripod){ 
+  if(tripod==tripod1){
+    Serial.println("moving tripod1");
+    changeAngles(RF);
+    changeAngles(LM);
+    changeAngles(RB);
+  }
+  else{
+    Serial.println("moving tripod2");
+    changeAngles(LF);
+    changeAngles(RM);
+    changeAngles(LB);
+  }
+  footPos[tripod] = solveFootZ(tripod);
+  Serial.println(footPos[tripod]);
+  hexy.delay_ms(incrementDelay); // wait
+  Serial.println("moveLegs complete");
+}
+/////////////////////////////////////////////////////////////////
+// start debugging here - JG
+void solveLegs(float y,float z,int tripod){
+  if(tripod==tripod1){
+    solveJoints(xF,y,z,RF);
+    solveJoints(xM,y,z - maxStep/2,LM);
+    solveJoints(xF,y,z - maxStep,RB);
+  }
+  else{
+    solveJoints(xF,y,z,LF);
+    solveJoints(xM,y,z - maxStep/2,RM);
+    solveJoints(xF,y,z - maxStep,LB);
+  }
+  Serial.print("solveLegs for tripod #: ");
+  Serial.println(tripod);
+}
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+// this function works in the testServo code - JG
+void changeAngles(int leg){ 
+  // this will change the angles of all joints for the given leg to the angles in the given array.
+  int hip = legIndex(leg,HIP);
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
+  // 4/27 - the following code was replaced to use servoSelect, which was added at bottom
+  if( leg == LF || leg == LM || leg == LB ){
+    servoSelect(hip + pinOffset, -servoAngles[hip]);
+    servoSelect(knee + pinOffset, servoAngles[knee]);
+    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+  }
+  else{
+    servoSelect(hip + pinOffset, servoAngles[hip]);
+    servoSelect(knee + pinOffset, servoAngles[knee]);
+    servoSelect(ankle + pinOffset, -servoAngles[ankle]);
+  }
+}
+
+///////////////////////////////////////////////////////////////////
+// This will solve joint angles, given x, y, and z in mm, relative to the coxa-body joint.
+// Also pass the appropriate joint array: solveJoints( x, y , z, appropriateJointArray ).
+// I'll have it return the angles in degrees.
+void solveJoints(float x, float y, float z,  int leg){
+  // Declare vars:
+  int hip = legIndex(leg,HIP);
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
+  float L, l, H, t, f, h, tc, alpha, beta, theta;
+  // Let's do trig:
+  L = abs(sqrt(pow(x,2)+pow(z,2))); l = L - COXA;
+  H = abs(sqrt(pow(l,2)+pow(y,2)));
+  t = acos( (pow(FEMUR,2) + pow(H,2) - pow(TIBIA,2)) / (2*FEMUR*H) );
+  f = acos( (pow(TIBIA,2) + pow(H,2) - pow(FEMUR,2)) / (2*TIBIA*H) );
+  h = pi - t - f;
+  tc = acos( y / H );
+  // Result in radians:
+  alpha = pi / 2 - ( t + tc );
+  beta = pi - h;
+  theta = atan( z / x );
+  // Result in degrees:
+  servoAngles[hip] = theta * 180 / pi + calibOff[hip];
+  servoAngles[knee] = alpha * 180 / pi + calibOff[knee];
+  servoAngles[ankle] = beta * 180 / pi + calibOff[ankle];
+//  Serial.println("Solve joints, the servoAngles are: ");
+//  Serial.print("Hip: "); Serial.println(servoAngles[hip]);
+//  Serial.print("Knee: "); Serial.println(servoAngles[knee]);
+//  Serial.print("Ankle: "); Serial.println(servoAngles[ankle]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// This solves for z foot position, given joint angles. Useful so the robot knows where it is.
+float solveFootZ( int tripod ){
+  // Declare vars:
+  float L, y, x, z;
+  int leg;
+  if(tripod==tripod1){
+    leg = RF;
+  }
+  else{
+    leg = LF;
+  }
+  int hip = legIndex(leg,HIP);
+  int knee = legIndex(leg,KNEE);
+  int ankle = legIndex(leg,ANKLE);
+  // Convert angles to radians:
+  float alpha = (servoAngles[knee] - calibOff[knee]) * pi / 180;
+  float beta = (servoAngles[ankle] - calibOff[ankle]) * pi / 180;
+  float theta = (servoAngles[hip] - calibOff[hip]) * pi / 180;
+
+  L = COXA + FEMUR * cos(alpha) + TIBIA * cos(alpha+beta);
+  y = FEMUR * sin(alpha) + TIBIA * sin(alpha+beta);
+  x = L * cos(theta);
+  z = L * sin(theta);
+
+  return(z);
+}
+
+//////////////////////////////////////////////////
+// This converts an angle to ms for the servos
+short a2ms(float inAngle){ // change inAngle from short to float 4/28 jg
+  if(inAngle>90){
+    inAngle = 90;
+  }
+  else if(inAngle<-90){
+    inAngle = -90;
+  }
+  short MS = inAngle*1000/90+1500;
+  return MS;
+}
+
+/////////////////////////////////////////////////
+// This gets input from serial
+// '0' is 48, '1' is 49, '2' is 50, look up ascii tables for the rest.
+int getVal(){
+  int input;
+  if (Serial.available() > 0) {
+    input = Serial.read();
+    //Serial.println(input);
+  }
+  else{
+    input = -1;
+  }
+  return(input);
+}
+
+////////////////////////////////////////////////////
+// This function is to test forward movement.
+// Enter '2' to move forward, '1' to stop.
+void serialMoveTest(){
+  int val = getVal();
+  if(val==GO){
+    goForward = true; 
+    Serial.println("GO");
+  }
+
+  while(goForward){
+    moveForward();
+    val = getVal();
+    if(val==STOP){
+      goForward = false;
+      Serial.println("STOP");
+      servoRest();
+    }
+  }
+}
+
+///////////////////////////////////////////////////////
+// This kills all servos.
+void servoRest(){
+  // kill all servos
+  for(int i=0; i<32; i++){
+    hexy.changeServo(i,-1);
+  }
+}
+
+//////////////////////////////////////////////////////
+// This outputs the correct array index for the given leg and joint.
+// leg constants might need to be altered based on the wiring of the hexy.
+int legIndex(int leg, int joint){
+  return (leg*LEG + joint);
+}
+
+/////////////////////////////////////////////////////////
+// Selects the servo to change, taken from testServo code
+void servoSelect( int selectedServo, float inputAngle ){
+  hexy.changeServo(selectedServo, a2ms(inputAngle));
+}
+
+
+////////////////////////// COMPUTER VISION FUNCTIONS ////////////////
+///////////////////currently not using any of the below
 
 /* blockLocation() finds the x and y coordinates of the block that we want Pixy to identify
   it also scales the object to find the distance Hexy is away from object
