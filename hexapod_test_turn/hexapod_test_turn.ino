@@ -197,7 +197,9 @@ void serialTurnTest(){
 /////////////////////////////////////////////////////////////////////////
 // This does some turning:
 void turnToThe(int turnDirection){
+  // Makes sure legs are coordinated to turn
   if(readyToTurn[turnDirection]){
+    // when tripod 1 is lifted, tripod 2 feet touching
    if(tripodLifted[tripod1]){
     if(!fullStep[tripod1]||!fullStep[tripod2]){// if one or the other tripod isnt done moving, keep moving
       swingLegsRot(tripod1,turnDirection);
@@ -210,11 +212,13 @@ void turnToThe(int turnDirection){
       fullStep[tripod2]=false;
     }
    }
+   // when tripod 2 is lifted, tripod 1 feet touching
    else if(tripodLifted[tripod2]){
     if(!fullStep[tripod1]||!fullStep[tripod2]){
       swingLegsRot(tripod2,turnDirection);
       powerLegsRot(tripod1,turnDirection);
     }
+    // both tripods done moving
     else{
       justDrop(tripod2);
       justLift(tripod1);
@@ -227,6 +231,7 @@ void turnToThe(int turnDirection){
     fullStep[tripod1]=false;
    }
   }
+  // if legs ren't ready to turn, get them ready:
   else{
     prepareToTurn(turnDirection);
   }
@@ -298,6 +303,7 @@ void justDrop(int tripod){
 void plantFeetTurn(int tripod, int turn){
   swingLegsRot(tripod,turn);
   justDrop(tripod);
+  fullStep[tripod]=false;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -332,7 +338,9 @@ void swingLegsRot(int tripod, int turn){
     }
   }
   moveLegs(tripod);
+  fullStep[tripod]=true;
   hexy.delay_ms(dropDelay);
+  restLegs(tripod);  
 }
 
 
@@ -342,17 +350,21 @@ void powerLegsRot(int tripod,int turnDirection){
   int front; int middle; int back;
   int dirMod = turnModifier(turnDirection);// -1 is left, 1 is right
   int podMod = turnModifier(tripod);
+  // Sets servo indices based on which tripod we're moving:
   if(tripod==tripod1){
     front = legIndex(RF,HIP); middle = legIndex(LM,HIP); back = legIndex(RB,HIP);    
   }
   else{
     front = legIndex(LF,HIP); middle = legIndex(RM,HIP); back = legIndex(LB,HIP);
   }
+  // Only continues to move if it hasn't yet completed a full step:
   if(!fullStep[tripod]){
     servoAngles[front] += thetaIncrement*dirMod*podMod;
     servoAngles[middle] -= thetaIncrement*dirMod*podMod;
     servoAngles[back] += thetaIncrement*dirMod*podMod;
+    // Conditions for completing a step:
     if(tripod==tripod1){
+      // Tripod 1 turning right:
       if(turnDirection==RIGHT){
         if(servoAngles[front]>=0){
           fullStep[tripod1] = true;
@@ -360,6 +372,7 @@ void powerLegsRot(int tripod,int turnDirection){
           Serial.print(" to the  ");Serial.println(turnDirection);
         }
       }
+      // Tripod 1 turning left:
       else{
         if(servoAngles[front]<=-bodyAngle+minAngle){
           fullStep[tripod1] = true;
@@ -369,16 +382,18 @@ void powerLegsRot(int tripod,int turnDirection){
       }
     }
     if(tripod==tripod2){
+      // Tripod 2 turning right:
       if(turnDirection==RIGHT){
         if(servoAngles[front]<=-bodyAngle+minAngle){
-          fullStep[tripod1] = true;
+          fullStep[tripod2] = true;
           Serial.print("Step Taken by tripod ");Serial.println(tripod+1);
           Serial.print(" to the  ");Serial.println(turnDirection);
         }
       }
+      // Tripod 2 turning Left:
       else{
         if(servoAngles[front]>=0){
-          fullStep[tripod1] = true;
+          fullStep[tripod2] = true;
           Serial.print("Step Taken by tripod ");Serial.println(tripod+1);
           Serial.print(" to the  ");Serial.println(turnDirection);
         }
@@ -394,6 +409,28 @@ void powerLegsRot(int tripod,int turnDirection){
 int turnModifier(int turnDirection){
   int mod = -1*((turnDirection+1)*2-3);
   return(mod);  
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//IMPORTED FUNCTION (exact)
+void restLegs(int tripod){
+  if(tripod==tripod1){
+    int servosToRest[] = {3,4,5,9,10,11,15,16,17};
+    Serial.println("resting tripod1");
+    for(int i=0;i<9;i++){
+      hexy.changeServo(servosToRest[i]+pinOffset,-1);
+    }
+  }
+  else{
+    int servosToRest[] = {0,1,2,6,7,8,12,13,14};
+    Serial.println("resting tripod2");
+    for(int i=0;i<9;i++){
+      hexy.changeServo(servosToRest[i]+pinOffset,-1);
+    }
+  }
+  
+  //footPos[tripod] = solveFootZ(tripod);
+  //hexy.delay_ms(2000); // wait 2s
 }
 
 ///////////////////////////////////////////////////////////////////////////////
