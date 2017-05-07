@@ -3,7 +3,7 @@ Main code for Hexy Robot
 
 Update 5/4/17 - Added hexapod_forwardMovement_outline functions and variables
 
-Update 5/7/17 - Added hexapod_test_turn functions and variables
+Update 5/7/17 - Added hexapod_test_turn functions and variables, Pixy removed until i2C is ready
 */
 
 // BasicLinearAlgebra - Version: Latest 
@@ -13,17 +13,17 @@ Update 5/7/17 - Added hexapod_test_turn functions and variables
 #include "Servotor32.h" // call the servotor32 Library
 //#include <ros.h>
 //#include <SPI.h>
-#include <Pixy.h>
+//#include <Pixy.h>
 #include <math.h>
 Servotor32 hexy; // create a servotor32 object
 
 /////////////////// Pixy variables ///////////////////////
-Pixy pixy;
-int j;
-int x;
-int y;
-int w;
-int h;
+//Pixy pixy;
+int j; // block index
+int x; // x location of block 
+int y; // y location of block
+int w; // width of block
+int h; // height of block
 uint16_t blocks;
 char buf[32]; 
 const int target = 2; // any number from 1-7 for normal signatures, orange is taught on signature 2
@@ -122,7 +122,7 @@ void setup() {
     Serial.begin(19200);
     Serial.print("Starting...\n");
     
-    pixy.init();
+    //pixy.init();
     while(!Serial){}
   
     // serialMoveTest Instructions:
@@ -138,7 +138,7 @@ void loop() {
   // http://www.cmucam.org/projects/cmucam5/wiki/PID_LEGO_Block
   while (true) {
     // look for blocks
-    blocks = pixy.getBlocks(); // this function returns number of blocks (objects) detected, starting from 1
+    blocks = 1;//pixy.getBlocks(); // this function returns number of blocks (objects) detected, starting from 1
     static int i = 0; // only created an initialized the first time loop() is called
     
     // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
@@ -148,12 +148,12 @@ void loop() {
       int blockSize = 0;
       int blockNum;
       for (j=0; j<blocks; j++) {
-        if (pixy.blocks[j].signature == target) {
+        //if (pixy.blocks[j].signature == target) {
           //blockLocation(j); // calculates x, y, dist of object wrt Hexy coordinates
           
           // if multiple blocks detected in target signature, choose largest object to follow
-          w = pixy.blocks[j].width;
-          h = pixy.blocks[j].height;
+          w = 15;//pixy.blocks[j].width;
+          h = 15;//pixy.blocks[j].height;
           // make the blockSize square based on largest dimension
           if (w >= h) { 
             h = w;
@@ -166,15 +166,15 @@ void loop() {
               blockSize = jsize;
               blockNum = j;
           }
-        }
+        //}
       }
-      x = pixy.blocks[blockNum].x;
-      y = pixy.blocks[blockNum].y;
+      x = 70;//pixy.blocks[blockNum].x;
+      y = 70;//pixy.blocks[blockNum].y;
       int xError = xCenter - x;
       int yError = yCenter - y;
       int sizeError = maxSize - blockSize;
       if (i%50==0) {
-        pixy.blocks[blockNum].print();
+        //pixy.blocks[blockNum].print();
         Serial.print(i); // for debugging
         Serial.print("\t");
         Serial.print(lastEventTime);
