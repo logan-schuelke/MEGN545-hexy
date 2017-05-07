@@ -391,7 +391,7 @@ short a2ms(float inAngle){ // change inAngle from short to float 4/28 jg
   else if(inAngle<-90){
     inAngle = -90;
   }
-  short MS = inAngle*1000/90+1500;
+  short MS = inAngle*500/90+1500;
   return MS;
 }
 
