@@ -120,8 +120,8 @@ float dedReck = 0;
 /////////END GLOBAL VARIABLES/////////////
 
 void setup() {
-  Serial.begin(19200);
-  Serial.print("Starting...\n");
+  //Serial.begin(19200);
+  //Serial.print("Starting...\n");
   
   // Attach all servos to a pin and put them at start pos:
   for (int i = 0; i < 18; i++) {
@@ -146,62 +146,62 @@ void loop() {
     if (xError >= xBand) {
       turnRight = false;
       turnLeft = true;
-      Serial.print("Hexy TURN LEFT\n");
+      //Serial.print("Hexy TURN LEFT\n");
     }
     else if (xError < -xBand) {
       turnRight = true;
       turnLeft = false;
-      Serial.print("Hexy TURN RIGHT\n");
+      //Serial.print("Hexy TURN RIGHT\n");
     }
     else {
-      Serial.print("Hexy NO TURN\n");
+      //Serial.print("Hexy NO TURN\n");
     }
     // While loop for right turns:
     while (turnRight) {
       turnToThe(RIGHT);
-      Serial.print("Hexy turning RIGHT\n");
+      //Serial.print("Hexy turning RIGHT\n");
       blockInfo();
       if (abs(xError)-xBand < 0) {
         turnRight = false;
-        Serial.println("STOP");
+        //Serial.println("STOP");
       }
       else if (xError > xBand) {
         turnRight = false;
         turnLeft = true;
-        Serial.println("Stopping and turning other way...");
+        //Serial.println("Stopping and turning other way...");
       }
     }
     // While loop for left turns:
     while (turnLeft) {
       turnToThe(LEFT);
-      Serial.print("Hexy turning LEFT\n");
+      //Serial.print("Hexy turning LEFT\n");
       blockInfo();
       if ((abs(xError)-xBand) < 0) {
         turnLeft = false;
-        Serial.println("STOP");
+        //Serial.println("STOP");
       }
       else if (xError < -xBand) {
         turnLeft = false;
         turnRight = true;
-        Serial.println("Stopping and turning other way...");
+        //Serial.println("Stopping and turning other way...");
       }
     }
     blockInfo();
     if (w <= 75) {
       goForward = true;
-      Serial.print("Hexy walk FORWARD\n");
+      //Serial.print("Hexy walk FORWARD\n");
     }
     else {
       goForward = false;
-      Serial.print("Hexy NO walk\n");
+      //Serial.print("Hexy NO walk\n");
     }
     while (goForward) {
       moveForward();
-      Serial.print(".");
+      //Serial.print(".");
       blockInfo();
       if (w > 100) {
         goForward = false;
-        Serial.println("STOP");
+        //Serial.println("STOP");
       }
       if (abs(xError)-xBand > 0) {
         goForward = false;
@@ -377,7 +377,7 @@ void setReadyStance() {
   //    Serial.print("The servoAngles for "); Serial.print(i+7); Serial.print(" is: ");
   //    Serial.println(servoAngles[i]);
   //  }
-  Serial.print("setReadyStance complete\n");
+  //Serial.print("setReadyStance complete\n");
 
 }
 
@@ -514,37 +514,37 @@ short a2ms(float inAngle) { // change inAngle from short to float 4/28 jg
 /////////////////////////////////////////////////
 // This gets input from serial
 // '0' is 48, '1' is 49, '2' is 50, look up ascii tables for the rest.
-int getVal() {
-  int input;
-  if (Serial.available() > 0) {
-    input = Serial.read();
-    //Serial.println(input);
-  }
-  else {
-    input = -1;
-  }
-  return (input);
-}
+//int getVal() {
+//  int input;
+//  if (Serial.available() > 0) {
+//    input = Serial.read();
+//    //Serial.println(input);
+//  }
+//  else {
+//    input = -1;
+//  }
+//  return (input);
+//}
 
 ////////////////////////////////////////////////////
 // This function is to test forward movement.
 // Enter '2' to move forward, '1' to stop.
-void serialMoveTest() {
-  int val = getVal();
-  if (val == GO) {
-    goForward = true;
-    Serial.println("GO");
-  }
-
-  while (goForward) {
-    moveForward();
-    val = getVal();
-    if (val == STOP) {
-      goForward = false;
-      Serial.println("STOP");
-    }
-  }
-}
+//void serialMoveTest() {
+//  int val = getVal();
+//  if (val == GO) {
+//    goForward = true;
+//    Serial.println("GO");
+//  }
+//
+//  while (goForward) {
+//    moveForward();
+//    val = getVal();
+//    if (val == STOP) {
+//      goForward = false;
+//      Serial.println("STOP");
+//    }
+//  }
+//}
 
 //////////////////////////////////////////////////////
 // This outputs the correct array index for the given leg and joint.
@@ -823,7 +823,7 @@ void blockInfo()
   // look for blocks
   blocks = pixy.getBlocks(); // this function returns number of blocks (objects) detected, starting from 1
   //static int i = 0; // only created an initialized the first time loop() is called
-  Serial.println(blocks);
+  //Serial.println(blocks);
   // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
   //if (blocks) {
     //i++;
