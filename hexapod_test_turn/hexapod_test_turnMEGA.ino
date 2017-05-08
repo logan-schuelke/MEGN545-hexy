@@ -75,12 +75,12 @@ const int firstServo = 7;
   const int LF = 1; const int LM = 2; const int LB = 3;
   const int LEG = 3; const int HIP = -3; const int KNEE = -2; const int ANKLE = -1;
   // pinOffset allows servos to be split bt the two sides of the board
-  const int pinOffset = 7;
+  const int pinOffset = 22;
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 // More stuff for turn functions:
 
-  float thetaIncrement = 5; // number of degrees per increment while turning
+  float thetaIncrement = 6; // number of degrees per increment while turning
   
   boolean readyToTurn[] = {false, false};
   const int RIGHT = 0;
@@ -90,7 +90,7 @@ const int firstServo = 7;
   boolean fullStep[] = {false,false};
 
   // All delays in ms:
-  const int dropDelay = 500; // How long to wait after telling legs to drop
+  const int dropDelay = 800; // How long to wait after telling legs to drop
   const int readyDelay = 1000; // How to wait for legs to get into start positoin
   const int incrementDelay = 0; // How long to wait each incremental movement
   // Serial inputs:
@@ -106,7 +106,7 @@ void setup() {
   for(int i=0;i<18;i++){
     servos[i].attach(i+pinOffset);
     // I believe servo.h uses 0-180, not -90-90:
-    servos[i].write(startPos[i]+90);
+    //servos[i].write(startPos[i]+90);
   }
   //hexy.begin();
   
@@ -177,7 +177,7 @@ void serialTurnTest(){
     if(val==STOP){
       turnRight = false;
       Serial.println("STOP");
-      servoRest();
+      //servoRest();
     }
     else if(val==TURN_LEFT){
       turnRight = false;
@@ -192,7 +192,7 @@ void serialTurnTest(){
     if(val==STOP){
       turnLeft = false;
       Serial.println("STOP");
-      servoRest();
+      //servoRest();
     }
     else if(val==TURN_RIGHT){
       turnLeft = false;
@@ -348,8 +348,8 @@ void swingLegsRot(int tripod, int turn){
   }
   moveLegs(tripod);
   fullStep[tripod]=true;
-  delay(dropDelay);
-  restLegs(tripod);  
+  //delay(dropDelay);
+  //restLegs(tripod);  
 }
 
 
@@ -420,40 +420,10 @@ int turnModifier(int turnDirection){
   return(mod);  
 }
 
-/////////////////////////////////////////////////////////////////////////////
-//IMPORTED FUNCTION (exact)
-void restLegs(int tripod){
-  if(tripod==tripod1){
-    int servosToRest[] = {3,4,5,9,10,11,15,16,17};
-    Serial.println("resting tripod1");
-    for(int i=0;i<9;i++){
-      changeServo(servosToRest[i]+pinOffset,-1);
-    }
-  }
-  else{
-    int servosToRest[] = {0,1,2,6,7,8,12,13,14};
-    Serial.println("resting tripod2");
-    for(int i=0;i<9;i++){
-      changeServo(servosToRest[i]+pinOffset,-1);
-    }
-  }
-  
-  //footPos[tripod] = solveFootZ(tripod);
-  //delay(2000); // wait 2s
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 ////////////////////OLD FUNCTIONS STILL IN USE:////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////////
-    // This kills all servos.
-    void servoRest(){
-      // kill all servos
-      for(int i=0; i<32; i++){
-        changeServo(i,-1);
-      }
-    }
     
     /////////////////////////////////////////////////////////////////////////////
     //IMPORTED FUNCTION (exact)
@@ -536,133 +506,12 @@ void restLegs(int tripod){
       // This converts angles to ms for servotor:
       //short MS = inAngle*1000/90+1500;
       // This coverts angles to ms for servo.h ( i think ):
-      short uS = inAngle*500/90+1500;
+      short uS = inAngle*1000/90+1500;
       return uS;
     }
-    
-
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-/////////////////////////OLD FUNCTONS///////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////
-//// This is to test servos:
-//void testServos(){
-//  int val = getVal();
-//  if( val == Pos1 ){
-//    currentPos = angle1;
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == Pos2 ){
-//    currentPos = angle2;
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == neutral ){
-//    currentPos = angleN;
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == Up ){
-//    currentPos += increment;
-//    if( currentPos > 90 ){ //Makes sure it doesn't go over 180 deg
-//      currentPos = 90;
-//    }
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);    
-//  }
-//  else if( val == Down ){
-//    currentPos -= increment;
-//    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
-//      currentPos = -90;
-//    }    
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == smallDown ){
-//    currentPos -= 1;
-//    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
-//      currentPos = -90;
-//    }    
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == smallUp ){
-//    currentPos += 1;
-//    if( currentPos < -90 ){ //Makes sure it doesn't go below 0 deg 
-//      currentPos = -90;
-//    }    
-//    Serial.print("Servo angle = ");
-//    Serial.println(currentPos);
-//  }
-//  else if( val == nextServo ){
-//    selectedServo += 1;
-//    if( selectedServo > numberOfServos+firstServo ){ //Makes sure max servo is 18
-//      selectedServo = numberOfServos+firstServo-1;
-//    }
-//    currentPos = Pos1;
-//    Serial.print("Selected servo = ");
-//    Serial.println(selectedServo);
-//  }
-//  else if( val == prevServo ){
-//    selectedServo -= 1;
-//    if( selectedServo < firstServo ){ // makes sure min servo is 1
-//      selectedServo = firstServo;
-//    }
-//    currentPos = Pos1;
-//    Serial.print("Selected servo = ");
-//    Serial.println(selectedServo);
-//  }
-//  servoSelect( selectedServo, currentPos );
-//}
-//
-//
-///////////////////////////////////////////////////////////////////////////////
-//////////////////New Functions for testing////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-//
-//////////////////////////////////////////////////////////////////////////////
-////NEW FUNCTION
-//// Test routine for imported functions:
-//void testAllServos(){
-//  int val = getVal();
-//  if(val==Pos1){
-//    Serial.println("Setting all joints to zero degrees...");
-//    setAnglesToZero();
-//    moveLegs(tripod1);
-//    moveLegs(tripod2);
-//    Serial.println("...Done");
-//  }
-//  else if(val==Pos2){
-//    Serial.println("Setting all joints to start position...");
-//    setAnglesToStart();
-//    moveLegs(tripod1);
-//    moveLegs(tripod2);
-//    Serial.println("...Done");
-//  }
-//}
-///////////////////////////////////////////////////////////////////////////////
-////NEW FUNCTION
-//// Quickly sets all angles in the array to zero.
-//void setAnglesToZero(){
-//  for(int i=0;i<18;i++){
-//    servoAngles[i] = 0;
-//  }
-//}
-///////////////////////////////////////////////////////////////////////////////
-////NEW FUNCTION
-//// Sets all angles to default position.
-//void setAnglesToStart(){
-//  for(int i=0;i<18;i++){
-//    servoAngles[i] = startPos[i];
-//  }
-//}
 
 ///////////////////////////////////////////////////////////////////////////
 // New function for using servo.h instead of servotor:
 void changeServo(int joint, int uS){
-  servos[joint].writeMicroseconds(uS);
+  servos[joint-pinOffset].writeMicroseconds(uS);
 }
