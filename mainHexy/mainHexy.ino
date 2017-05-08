@@ -4,18 +4,14 @@ Main code for Hexy Robot
 Update 5/4/17 - Added hexapod_forwardMovement_outline functions and variables
 
 Update 5/7/17 - Added hexapod_test_turn functions and variables
+                Changing to MEGA
 */
 
-// BasicLinearAlgebra - Version: Latest 
-//#include <BasicLinearAlgebra.h>
-//#include <MemoryDelegate.hpp>
-
-#include "Servotor32.h" // call the servotor32 Library
-//#include <ros.h>
-//#include <SPI.h>
+#include <Servo.h>
+Servo servos[18];
+#include <SPI.h>
 #include <Pixy.h>
-#include <math.h>
-Servotor32 hexy; // create a servotor32 object
+//#include <ros.h>
 
 /////////////////// Pixy variables ///////////////////////
 Pixy pixy;
@@ -28,7 +24,7 @@ uint16_t blocks;
 char buf[32]; 
 const int target = 2; // any number from 1-7 for normal signatures, orange is taught on signature 2
 //float error = 0.3;
-//float dist;
+float dist;
 const int maxSize = 3600L; // closest that Hexy can get to Pixy, max camera pixel size is 64000 (320*200)
 const int xCenter = 160L; // center of Pixy lens
 const int yCenter = 100L;
@@ -118,7 +114,6 @@ const float liftAngle = 30; //degrees to lift knee without solving
 /////////END GLOBAL VARIABLES/////////////
 
 void setup() {
-    hexy.begin();
     Serial.begin(19200);
     Serial.print("Starting...\n");
     
@@ -142,7 +137,7 @@ void loop() {
     static int i = 0; // only created an initialized the first time loop() is called
     
     // If the block we want is in view, rotate Hexy to face it, then take x steps towards or away from it
-    if (blocks) { // if blocks are detected...
+    if (blocks) {
       lastEventTime = millis(); // record time block is detected
       i++;
       int blockSize = 0;
@@ -155,19 +150,21 @@ void loop() {
           w = pixy.blocks[j].width;
           h = pixy.blocks[j].height;
           // make the blockSize square based on largest dimension
-          if (w >= h) { 
-            h = w;
-          }
-          else {
-            w = h;
-          }
-          int jsize = w*h; 
+//          if (w >= h) { 
+//            h = w;
+//          }
+//          else {
+//            w = h;
+//          }
+          // make the blockSize square based on width dimension, assuming width is more accurate
+          int jsize = w*w; 
           if (jsize >= blockSize) {
               blockSize = jsize;
               blockNum = j;
           }
         }
       }
+      dist = blockDistance(w); // can send this information to ROS
       x = pixy.blocks[blockNum].x;
       y = pixy.blocks[blockNum].y;
       int xError = xCenter - x;
@@ -276,14 +273,14 @@ void liftLegs(int tripod){
   solveLegs(yLift,z[tripod],tripod);
   moveLegs(tripod);
   tripodLifted[tripod] = true;
-  hexy.delay_ms(dropDelay); // wait
+  delay(dropDelay); // wait
 }
 //////////////////////////////////////////////////////////////////
 void dropLegs(int tripod){
   solveLegs(yStand,z[tripod],tripod);
   moveLegs(tripod);
   tripodLifted[tripod] = false;
-  hexy.delay_ms(dropDelay); // wait
+  delay(dropDelay); // wait
 }
 //////////////////////////////////////////////////////////////////
 void swingLegs(int tripod){
@@ -322,7 +319,7 @@ void setReadyStance(){
   solveLegs(yStand, maxStep, tripod1);
   moveLegs(tripod1); 
   moveLegs(tripod2);
-  hexy.delay_ms(readyDelay); // wait for legs to get into position
+  delay(readyDelay); // wait for legs to get into position
 //  int i;
 //  for(i=0;i<18;i++){
 //    Serial.print("The servoAngles for "); Serial.print(i+7); Serial.print(" is: ");
@@ -333,7 +330,6 @@ void setReadyStance(){
 }
 
 /////////////////////////////////////////////////////////////////
-// this function works in the testServo code - JG
 void moveLegs(int tripod){ 
   if(tripod==tripod1){
     Serial.println("moving tripod1");
@@ -349,11 +345,10 @@ void moveLegs(int tripod){
   }
   footPos[tripod] = solveFootZ(tripod);
   Serial.println(footPos[tripod]);
-  hexy.delay_ms(incrementDelay); // wait
+  delay(incrementDelay); // wait
   Serial.println("moveLegs complete");
 }
 /////////////////////////////////////////////////////////////////
-// start debugging here - JG
 void solveLegs(float y,float z,int tripod){
   if(tripod==tripod1){
     solveJoints(xF,y,z,RF);
@@ -371,7 +366,6 @@ void solveLegs(float y,float z,int tripod){
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
-// this function works in the testServo code - JG
 void changeAngles(int leg){ 
   // this will change the angles of all joints for the given leg to the angles in the given array.
   int hip = legIndex(leg,HIP);
@@ -458,7 +452,7 @@ short a2ms(float inAngle){ // change inAngle from short to float 4/28 jg
   else if(inAngle<-90){
     inAngle = -90;
   }
-  short MS = inAngle*1000/90+1500;
+  short MS = inAngle*500/90+1500;
   return MS;
 }
 
@@ -503,7 +497,7 @@ void serialMoveTest(){
 void servoRest(){
   // kill all servos
   for(int i=0; i<32; i++){
-    hexy.changeServo(i,-1);
+    changeServo(i,-1);
   }
 }
 
@@ -517,9 +511,14 @@ int legIndex(int leg, int joint){
 /////////////////////////////////////////////////////////
 // Selects the servo to change, taken from testServo code
 void servoSelect( int selectedServo, float inputAngle ){
-  hexy.changeServo(selectedServo, a2ms(inputAngle));
+  changeServo(selectedServo, a2ms(inputAngle));
 }
 
+///////////////////////////////////////////////////////////////////////////
+// New function for using servo.h instead of servotor:
+void changeServo(int joint, int uS){
+  servos[joint].writeMicroseconds(uS);
+}
 ///////////////////////////TURN FUNCTIONS/////////////////
 // This does some turning:
 void turnToThe(int turnDirection){
@@ -600,7 +599,7 @@ void justLift(int tripod){
   servoAngles[back] = servoAngles[back] - liftAngle;
   moveLegs(tripod);
   tripodLifted[tripod]=true;
-  hexy.delay_ms(dropDelay);
+  delay(dropDelay);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -622,7 +621,7 @@ void justDrop(int tripod){
   servoAngles[back+1] = START_POS_ANKLE;
   moveLegs(tripod);
   tripodLifted[tripod]=false;
-  hexy.delay_ms(dropDelay);
+  delay(dropDelay);
 }
 ////////////////////////////////////////////////////////////////////////////
 // This moves lifted legs and plants them to prepare to turn
@@ -665,7 +664,7 @@ void swingLegsRot(int tripod, int turn){
   }
   moveLegs(tripod);
   fullStep[tripod]=true;
-  hexy.delay_ms(dropDelay);
+  delay(dropDelay);
   restLegs(tripod);  
 }
 
@@ -744,14 +743,14 @@ void restLegs(int tripod){
     int servosToRest[] = {3,4,5,9,10,11,15,16,17};
     Serial.println("resting tripod1");
     for(int i=0;i<9;i++){
-      hexy.changeServo(servosToRest[i]+pinOffset,-1);
+      changeServo(servosToRest[i]+pinOffset,-1);
     }
   }
   else{
     int servosToRest[] = {0,1,2,6,7,8,12,13,14};
     Serial.println("resting tripod2");
     for(int i=0;i<9;i++){
-      hexy.changeServo(servosToRest[i]+pinOffset,-1);
+      changeServo(servosToRest[i]+pinOffset,-1);
     }
   }
   
@@ -761,34 +760,18 @@ void restLegs(int tripod){
 
 
 ////////////////////////// COMPUTER VISION FUNCTIONS ////////////////
-///////////////////currently not using any of the below
-
-/* blockLocation() finds the x and y coordinates of the block that we want Pixy to identify
-  it also scales the object to find the distance Hexy is away from object
+/* blockDistance() returns the distance Hexy is away from object
   If the object is always a certain size, scaling it 
   allows the robot to calculate distance.
 */
-//void blockLocation(int j)
-//{
-//  // j is the location in the block array that matches the target
-//  x = pixy.blocks[j].x;
-//  y = pixy.blocks[j].y;
-//  w = pixy.blocks[j].width;
-//  h = pixy.blocks[j].height; 
-//  
-//  // Compare width and height to some nominal width/height and scale
-//  // Let's say nominal is 1 ft away from Hexy, and we use a 2 in diameter ball
-//  // Pixy may read this width and height as 100 x 100
-//  // Need to find this relationship between distance and pixels
-//  wscale = w/100; // so if w is 100, wcale is 1, object is 1 ft from Hexy
-//  hscale = h/100;
-//  dist = (wscale + hscale)/2; // in feet
-//  
-//  // Transform the x and y coordinates of the block to the Hexy coordinates
-//  x = pixy2hexy(x);
-//  y = pixy2hexy(y);
-//}
-//
+float blockDistance(int width)
+{
+  // w = width of object, seems more accurate/consistent than height
+  // experimentally determined distance / width relationship
+  float d = -0.0238*width + 2.1301;
+  return d; // in feet
+}
+
 //// pixy2hexy() transforms the Pixy object coordinates to Hexy coordinates
 //int pixy2hexy(int pixycoord[], int n)
 //{
@@ -807,40 +790,3 @@ void restLegs(int tripod){
 //  return hexycoord;
 //}
 //
-///* This function simply prints the detected object blocks 
-// (including color codes) through the serial console.  It uses the Arduino's 
-// ICSP port. (see hello_world.ino example in Pixy folder)
-// It prints the detected blocks once per second because printing all of the 
-// blocks for all 50 frames per second would overwhelm the Arduino's serial port.
-//*/
-//void printBlocks()
-//{ 
-//  static int i = 0;
-//  int j;
-//  uint16_t blocks;
-//  char buf[32]; 
-//  
-//  // grab blocks!
-//  blocks = pixy.getBlocks();
-//  
-//  // If there are detect blocks, print them!
-//  if (blocks)
-//  {
-//    i++;
-//    
-//    // do this (print) every 50 frames because printing every
-//    // frame would bog down the Arduino
-//    if (i%50==0)
-//    {
-//      sprintf(buf, "Detected %d:\n", blocks);
-//      Serial.print(buf);
-//      for (j=0; j<blocks; j++)
-//      {
-//        sprintf(buf, "  block %d: ", j);
-//        Serial.print(buf); 
-//        pixy.blocks[j].print();
-//      }
-//    }
-//  }  
-//}
-
