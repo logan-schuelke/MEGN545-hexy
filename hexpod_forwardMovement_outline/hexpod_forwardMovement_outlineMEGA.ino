@@ -44,6 +44,7 @@
  *    one by one, to the servo calibration program to see when it stops working.
  *
  */
+ boolean displayTime = true;
 #include <Servo.h>
 Servo servos[18];
 //#include "Servotor32.h" // call the servotor32 Library
@@ -131,7 +132,7 @@ const int LF = 1; const int LM = 2; const int LB = 3;
 const int LEG = 3; const int HIP = -3; const int KNEE = -2; const int ANKLE = -1;
 
 // pinOffset allows servos to be split bt the two sides of the board
-const int pinOffset = 7;
+const int pinOffset = 22;
 
 // for movement test function:
 boolean goForward = false;
@@ -143,7 +144,7 @@ void setup() {
   for(int i=0;i<18;i++){
     servos[i].attach(i+pinOffset);
     // I believe servo.h uses 0-180, not -90-90:
-    servos[i].write(servoAngles[i]+90);
+    //servos[i].write(servoAngles[i]+90);
   }
   
   //hexy.begin();
@@ -157,7 +158,7 @@ void setup() {
 
 void loop() {
   setReadyStance(); // gets legs ready to move
-  servoRest();
+  //12servoRest();
   while(true){ // forever loops
     serialMoveTest(); // Test function for forward movement.
   }
@@ -251,11 +252,52 @@ void powerLegs(int tripod){
 //  tripod2 in rear position.
 // something may be wrong with solveLegs - JG
 void setReadyStance(){
-  solveLegs(yStand, 0, tripod2);
-  solveLegs(yStand, maxStep, tripod1);
-  moveLegs(tripod1); 
-  moveLegs(tripod2);
-  delay(readyDelay); // wait for legs to get into position
+  if(tripodLifted[tripod1]){
+    solveLegs(yLift, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+    solveLegs(yStand, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+    solveLegs(yLift, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+    solveLegs(yStand, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+  }
+  else if(tripodLifted[tripod2]){
+    solveLegs(yLift, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+    solveLegs(yStand, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+    solveLegs(yLift, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+    solveLegs(yStand, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+  }
+  else{
+    solveLegs(yLift, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+    solveLegs(yStand, maxStep, tripod1);
+    moveLegs(tripod1);
+    delay(dropDelay);
+    solveLegs(yLift, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+    solveLegs(yStand, 0, tripod2);
+    moveLegs(tripod2);
+    delay(dropDelay);
+  }
+  
+ // moveLegs(tripod1); 
+ // moveLegs(tripod2);
+ // delay(readyDelay); // wait for legs to get into position
 //  int i;
 //  for(i=0;i<18;i++){
 //    Serial.print("The servoAngles for "); Serial.print(i+7); Serial.print(" is: ");
@@ -288,6 +330,9 @@ void moveLegs(int tripod){
 /////////////////////////////////////////////////////////////////
 // start debugging here - JG
 void solveLegs(float y,float z,int tripod){
+  if(displayTime){
+    //int startTime = millis();
+  }
   if(tripod==tripod1){
     solveJoints(xF,y,z,RF);
     solveJoints(xM,y,z - maxStep/2,LM);
@@ -298,6 +343,7 @@ void solveLegs(float y,float z,int tripod){
     solveJoints(xM,y,z - maxStep/2,RM);
     solveJoints(xF,y,z - maxStep,LB);
   }
+  
   Serial.print("solveLegs for tripod #: ");
   Serial.println(tripod);
 }
@@ -391,7 +437,7 @@ short a2ms(float inAngle){ // change inAngle from short to float 4/28 jg
   else if(inAngle<-90){
     inAngle = -90;
   }
-  short MS = inAngle*500/90+1500;
+  short MS = inAngle*1000/90+1500;
   return MS;
 }
 
@@ -426,7 +472,7 @@ void serialMoveTest(){
     if(val==STOP){
       goForward = false;
       Serial.println("STOP");
-      servoRest();
+      //servoRest();
     }
   }
 }
@@ -456,5 +502,5 @@ void servoSelect( int selectedServo, float inputAngle ){
 ///////////////////////////////////////////////////////////////////////////
 // New function for using servo.h instead of servotor:
 void changeServo(int joint, int uS){
-  servos[joint].writeMicroseconds(uS);
+  servos[joint-pinOffset].writeMicroseconds(uS);
 }
