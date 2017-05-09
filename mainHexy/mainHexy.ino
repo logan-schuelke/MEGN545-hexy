@@ -129,7 +129,7 @@ void setup() {
   }
 
   pixy.init();
-  while (!Serial) {}
+  //while (!Serial) {}
   setReadyStance(); // gets legs ready to move
   // serialMoveTest Instructions:
   //Serial.println("Enter '2' to start movement, '1' to stop it.");
